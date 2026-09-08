@@ -7,7 +7,7 @@
  * 새 app.js 가 올라가 있어도 옛 코드가 실행됩니다. 그래서 이 워커는
  * 설치할 때도 실행 중에도 HTTP 캐시를 건너뛰고 원본에 직접 물어봅니다.
  */
-const CACHE = 'expense-shell-v4';
+const CACHE = 'expense-shell-v5';
 const SHELL = [
   './', './index.html', './styles.css', './api.js', './ui.js', './app.js',
   './manifest.webmanifest', './icons/icon.svg',

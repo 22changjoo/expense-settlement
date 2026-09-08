@@ -104,8 +104,42 @@ const UI = (() => {
 
   /* ---------- 이미지 ---------- */
 
-  /** 업로드 전 긴 변을 1600px 로 줄이고 JPEG 로 다시 인코딩합니다. */
-  function readImage(file, maxSide = 1600, quality = 0.82) {
+  /**
+   * 업로드 전 이미지를 줄입니다.
+   *
+   * 영수증은 글자만 읽히면 되므로 원본 그대로 둘 이유가 없습니다.
+   * 목표 용량(기본 200KB) 안에 들어올 때까지 해상도와 품질을 단계적으로 낮춥니다.
+   * 1400px / 품질 0.75 면 대개 100~200KB 이고, 금액·날짜를 읽는 데 충분합니다.
+   */
+  const IMAGE_STEPS = [
+    { maxSide: 1400, quality: 0.75 },
+    { maxSide: 1400, quality: 0.62 },
+    { maxSide: 1200, quality: 0.60 },
+    { maxSide: 1000, quality: 0.55 },
+    { maxSide: 900,  quality: 0.45 }
+  ];
+
+  function encodeAt(img, maxSide, quality) {
+    const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    // 축소할 때 글자가 뭉개지지 않도록 부드럽게 리샘플링합니다.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, w, h);
+    return { dataUrl: canvas.toDataURL('image/jpeg', quality), width: w, height: h };
+  }
+
+  /** base64 문자열의 실제 바이트 수 */
+  function base64Bytes(b64) {
+    const padding = (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
+    return Math.floor(b64.length * 3 / 4) - padding;
+  }
+
+  function readImage(file, targetBytes = 200 * 1024) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(new Error('이미지를 읽지 못했습니다.'));
@@ -113,23 +147,35 @@ const UI = (() => {
         const img = new Image();
         img.onerror = () => reject(new Error('이미지 형식을 인식하지 못했습니다.'));
         img.onload = () => {
-          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          let out = null;
+          for (const step of IMAGE_STEPS) {
+            out = encodeAt(img, step.maxSide, step.quality);
+            out.base64 = out.dataUrl.split(',')[1];
+            out.bytes = base64Bytes(out.base64);
+            if (out.bytes <= targetBytes) break;   // 목표 용량에 들면 더 줄이지 않습니다
+          }
           resolve({
-            dataUrl,
-            base64: dataUrl.split(',')[1],
-            mimeType: 'image/jpeg'
+            dataUrl: out.dataUrl,
+            base64: out.base64,
+            mimeType: 'image/jpeg',
+            bytes: out.bytes,
+            width: out.width,
+            height: out.height,
+            originalBytes: file.size
           });
         };
         img.src = reader.result;
       };
       reader.readAsDataURL(file);
     });
+  }
+
+  /** 1024 단위 사람이 읽는 크기 */
+  function fileSize(bytes) {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + 'B';
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + 'KB';
+    return (bytes / 1024 / 1024).toFixed(1) + 'MB';
   }
 
   /** 게이지 마크업. projected 가 있으면 점선 음영으로 예상분을 덧그립니다. */
@@ -190,7 +236,7 @@ const UI = (() => {
 
   return {
     won, num, esc, dateLabel, pct, tone, icon, refreshIcons, statusBadges,
-    toast, loading, openSheet, closeSheet, confirmSheet, readImage, gauge,
+    toast, loading, openSheet, closeSheet, confirmSheet, readImage, gauge, fileSize,
     donut, CATEGORY_ICON, SUB_ICON
   };
 })();

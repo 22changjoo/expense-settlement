@@ -13,7 +13,9 @@ var CFG = {
   SHEET_BUDGET: '예산설정',
 
   // Drive 폴더
-  DRIVE_ROOT: '경비정산시스템',
+  // 코드 프로젝트 폴더(내 드라이브/코딩/경비정산시스템)와 이름이 겹치지 않도록 구분해 둡니다.
+  DRIVE_ROOT: '경비정산_영수증',
+  DRIVE_ROOT_LEGACY: '경비정산시스템',   // 예전 이름 — 있으면 자동으로 새 이름으로 바꿉니다
   DRIVE_RECEIPT: '영수증',
   DRIVE_DEPOSIT: '입금캡처',
 

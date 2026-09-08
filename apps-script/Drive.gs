@@ -15,8 +15,45 @@ function folder_(parent, name) {
   return f;
 }
 
+/**
+ * 보관 폴더를 찾습니다.
+ *
+ * 한 번 찾은 폴더 ID 를 스크립트 속성에 적어 두므로, 나중에 Drive 에서 폴더를
+ * 옮기거나 이름을 바꾸셔도 앱은 계속 같은 폴더를 씁니다.
+ * 예전 이름(경비정산시스템)으로 만들어진 폴더가 있으면 새 이름으로 바꿔 이어 씁니다.
+ */
 function rootFolder_() {
-  return folder_(DriveApp.getRootFolder(), CFG.DRIVE_ROOT);
+  var saved = prop_('DRIVE_ROOT_ID');
+  if (saved) {
+    try {
+      var f = DriveApp.getFolderById(saved);
+      if (!f.isTrashed()) {
+        if (f.getName() === CFG.DRIVE_ROOT_LEGACY) f.setName(CFG.DRIVE_ROOT);
+        return f;
+      }
+    } catch (e) {
+      // 폴더가 지워졌거나 접근할 수 없으면 아래에서 다시 찾습니다.
+    }
+  }
+
+  var root = DriveApp.getRootFolder();
+  var found = null;
+
+  var it = root.getFoldersByName(CFG.DRIVE_ROOT);
+  if (it.hasNext()) found = it.next();
+
+  if (!found) {
+    var legacy = root.getFoldersByName(CFG.DRIVE_ROOT_LEGACY);
+    if (legacy.hasNext()) {
+      found = legacy.next();
+      found.setName(CFG.DRIVE_ROOT);      // 예전 폴더를 그대로 이어 씁니다
+    }
+  }
+
+  if (!found) found = folder_(root, CFG.DRIVE_ROOT);
+
+  props_().setProperty('DRIVE_ROOT_ID', found.getId());
+  return found;
 }
 
 function receiptFolder_(useDate) {

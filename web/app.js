@@ -614,6 +614,7 @@ function renderUpload() {
     <div class="card">
       ${u.analysisError ? `<p class="form-error">${UI.esc(u.analysisError)}</p>` : ''}
       ${u.analysis?.vendor ? `<p class="form-note" style="margin-top:0">인식한 상호: <b>${UI.esc(u.analysis.vendor)}</b>${u.analysis.confidence ? ` · 신뢰도 ${UI.esc(u.analysis.confidence)}` : ''}</p>` : ''}
+      ${u.bytes ? `<p class="form-note" style="margin-top:0">저장 크기 ${UI.fileSize(u.bytes)}${u.originalBytes > u.bytes ? ` (원본 ${UI.fileSize(u.originalBytes)} 에서 줄임)` : ''} · ${u.width}×${u.height}</p>` : ''}
 
       <div class="field"><span>항목</span>
         <div class="chip-group">
@@ -1504,7 +1505,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.08-4';
+const APP_VERSION = '2026.09.08-5';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
