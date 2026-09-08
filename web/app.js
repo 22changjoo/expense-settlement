@@ -119,7 +119,43 @@ function render() {
     settle: renderSettle, settings: renderSettings
   };
   const fn = map[State.view];
-  if (fn) fn();
+  if (!fn) return;
+  try {
+    fn();
+  } catch (e) {
+    // 화면이 통째로 비어 버리는 것보다, 무엇이 잘못됐는지 보여 주는 편이 낫습니다.
+    renderCrash(State.view, e);
+  }
+}
+
+function renderCrash(view, error) {
+  console.error('[' + view + '] 렌더링 실패', error);
+  const root = el('view-' + view);
+  if (!root) return;
+  root.innerHTML = `
+    <div class="card tone-danger">
+      <div class="card-head"><div class="card-title">${UI.icon('triangle-alert')} 화면을 그리지 못했습니다</div></div>
+      <p class="form-note" style="margin-top:0">앱과 서버 버전이 어긋났을 때 주로 생깁니다.
+        아래 버튼으로 최신 파일을 다시 받아 보십시오.</p>
+      <pre class="crash-detail">${UI.esc(String(error && error.message || error))}</pre>
+      <button class="btn btn-primary btn-block" id="crash-reload">${UI.icon('refresh-cw')} 최신 버전으로 새로고침</button>
+    </div>`;
+  UI.refreshIcons(root);
+  root.querySelector('#crash-reload').onclick = hardReload;
+}
+
+/** 서비스 워커 캐시를 비우고 다시 받아옵니다. */
+async function hardReload() {
+  UI.loading(true, '최신 버전을 받는 중…');
+  try {
+    if ('serviceWorker' in navigator) {
+      for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    }
+    if (window.caches) {
+      for (const k of await caches.keys()) await caches.delete(k);
+    }
+  } catch (e) { /* 캐시를 못 지워도 새로고침은 시도합니다 */ }
+  location.reload();
 }
 
 /* ---------------- 화면 B. 대시보드 ---------------- */
@@ -1102,16 +1138,36 @@ function openSettlementDetail(id) {
 
 /* ---------------- 화면 E. 설정 ---------------- */
 
+/**
+ * 예산 응답 정규화.
+ * 세부 한도를 지원하지 않는 이전 버전 백엔드가 응답해도 화면이 죽지 않도록,
+ * 빠진 필드를 채워 넣습니다.
+ */
+function normalizeBudget(raw) {
+  const b = Object.assign({}, raw);
+  b.연도 = Number(b.연도) || new Date().getFullYear();
+  b.목회비연간한도 = Number(b.목회비연간한도) || 0;
+  b.주유비연간한도 = Number(b.주유비연간한도) || 0;
+
+  if (!b.세부한도 || typeof b.세부한도 !== 'object') {
+    b.세부한도 = {};
+    const legacy = Number(b.목회비_건강관리한도) || 0;
+    if (legacy) b.세부한도['건강관리'] = legacy;
+  }
+  if (b.건강관리자동 === undefined) b.건강관리자동 = !b.세부한도['건강관리'];
+  return b;
+}
+
 function renderSettings() {
   const root = el('view-settings');
   const b = State.boot;
   if (!b) { root.innerHTML = ''; return; }
 
-  const budgets = b.budgets || [b.budget];
+  const budgets = (b.budgets && b.budgets.length ? b.budgets : [b.budget]).map(normalizeBudget);
   if (!State.budgetYear || !budgets.some(x => x.연도 === State.budgetYear)) {
     State.budgetYear = (budgets.find(x => x.연도 === b.budget.연도) || budgets[0]).연도;
   }
-  const budget = budgets.find(x => x.연도 === State.budgetYear) || b.budget;
+  const budget = budgets.find(x => x.연도 === State.budgetYear) || normalizeBudget(b.budget);
   const cfg = API.getConfig();
 
   // 세부 한도: 설정된 것만 목록에 보여 주고, 나머지는 "한도 추가" 에서 고릅니다.
@@ -1193,7 +1249,8 @@ function renderSettings() {
       <div id="drive-status"><p class="form-note" style="margin:0">확인 중…</p></div>
       <div class="spacer"></div>
       <div class="kv"><span class="k">웹앱 URL</span><span class="v" style="font-size:12px">${UI.esc(cfg.url)}</span></div>
-      <button class="btn btn-block" id="reset-conn" style="margin-top:12px">${UI.icon('unplug')} 연결 정보 다시 입력</button>
+      <button class="btn btn-block" id="app-refresh" style="margin-top:12px">${UI.icon('refresh-cw')} 최신 버전으로 새로고침</button>
+      <button class="btn btn-block" id="reset-conn" style="margin-top:8px">${UI.icon('unplug')} 연결 정보 다시 입력</button>
     </div>
 
     <div class="card">
@@ -1283,6 +1340,7 @@ function bindSettings(root, budget, addable) {
     btn.onclick = () => openSubscriptionSheet(b.subscriptions.find(s => s.구독ID === btn.dataset.subEdit));
   });
 
+  root.querySelector('#app-refresh').onclick = hardReload;
   root.querySelector('#reset-conn').onclick = () => showOnboarding();
 
   root.querySelectorAll('[data-export]').forEach(btn => {

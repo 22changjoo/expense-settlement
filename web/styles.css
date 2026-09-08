@@ -442,3 +442,10 @@ a { color: var(--accent); }
 .limit-name { flex: 1; min-width: 0; font-size: 13.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .limit-row input { width: 116px; flex: none; padding: 8px 10px; font-size: 14px; text-align: right; }
 .icon-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 28%, var(--border)); width: 32px; height: 32px; font-size: 14px; }
+
+.crash-detail {
+  margin: 12px 0; padding: 10px 12px;
+  background: var(--surface-2); border-radius: var(--radius-sm);
+  font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;
+  color: var(--text-2);
+}
