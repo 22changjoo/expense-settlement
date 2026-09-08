@@ -1,18 +1,61 @@
 /** 대시보드 집계 — 예산 게이지, 정기구독 예상 반영, 상태 배지. */
 
-function budgetForYear_(year) {
-  var rows = readSheet_(CFG.SHEET_BUDGET).rows;
-  var hit = null;
-  rows.forEach(function (r) { if (String(num_(r['연도'])) === String(year)) hit = r; });
-  if (!hit) hit = ensureBudgetRow_(year);
-  var pastoral = num_(hit['목회비연간한도']);
-  var health = num_(hit['목회비_건강관리한도']) || Math.round(pastoral * 0.2);
+/**
+ * 세부 한도는 `목회비_<세부항목>한도` 열로 저장합니다.
+ * 열을 추가하면 한도가 생기고, 열을 지우면 한도가 사라집니다.
+ * 기존 `목회비_건강관리한도` 열도 이 규칙에 그대로 들어맞습니다.
+ */
+var SUBLIMIT_RE = /^목회비_(.+)한도$/;
+
+function subLimitColumn_(name) {
+  return '목회비_' + name + '한도';
+}
+
+function budgetFromRow_(header, row) {
+  var pastoral = num_(row['목회비연간한도']);
+
+  var limits = {};
+  header.forEach(function (h) {
+    var m = String(h).match(SUBLIMIT_RE);
+    if (!m) return;
+    var v = num_(row[h]);
+    if (v > 0) limits[m[1]] = v;
+  });
+
+  // 건강관리는 값을 비워 두면 목회비 한도의 20% 로 자동 계산합니다(교회 규정 기본값).
+  var healthAuto = !limits['건강관리'];
+  if (healthAuto && pastoral) limits['건강관리'] = Math.round(pastoral * 0.2);
+
   return {
-    연도: Number(year),
+    연도: Number(num_(row['연도'])),
     목회비연간한도: pastoral,
-    목회비_건강관리한도: health,
-    주유비연간한도: num_(hit['주유비연간한도'])
+    주유비연간한도: num_(row['주유비연간한도']),
+    목회비_건강관리한도: limits['건강관리'] || 0,   // 이전 버전 호환용 별칭
+    건강관리자동: healthAuto,
+    세부한도: limits
   };
+}
+
+function budgetForYear_(year) {
+  var data = readSheet_(CFG.SHEET_BUDGET);
+  var hit = null;
+  data.rows.forEach(function (r) { if (String(num_(r['연도'])) === String(year)) hit = r; });
+  if (!hit) {
+    ensureBudgetRow_(year);
+    data = readSheet_(CFG.SHEET_BUDGET);
+    data.rows.forEach(function (r) { if (String(num_(r['연도'])) === String(year)) hit = r; });
+  }
+  if (!hit) throw new Error(year + '년 예산 행을 만들지 못했습니다.');
+  return budgetFromRow_(data.header, hit);
+}
+
+/** 등록된 모든 연도의 한도. 설정 화면의 연도 목록에 씁니다. */
+function listBudgets_() {
+  var data = readSheet_(CFG.SHEET_BUDGET);
+  return data.rows
+    .map(function (r) { return budgetFromRow_(data.header, r); })
+    .filter(function (b) { return b.연도; })
+    .sort(function (a, b) { return b.연도 - a.연도; });
 }
 
 /** 해당 연도 행이 없으면 전년도 값을 복사해 만듭니다(없으면 기본값). */
@@ -63,8 +106,15 @@ function allExpenses_() {
 }
 
 function allSubscriptions_() {
+  var linked = {};
+  readSheet_(CFG.SHEET_EXPENSE).rows.forEach(function (e) {
+    var id = String(e['연결구독ID'] || '');
+    if (id) linked[id] = (linked[id] || 0) + 1;
+  });
+
   return readSheet_(CFG.SHEET_SUBSCRIPTION).rows.map(function (r) {
     return {
+      연결지출건수: linked[String(r['구독ID'] || '')] || 0,
       구독ID: String(r['구독ID'] || ''),
       구독명: String(r['구독명'] || ''),
       목회비세부항목: String(r['목회비세부항목'] || ''),
@@ -188,7 +238,7 @@ function buildDashboard_(year) {
           이름: s,
           실사용: bySub[s],
           예상포함: bySub[s] + (projection.bySubcategory[s] || 0),
-          한도: s === '건강관리' ? budget.목회비_건강관리한도 : null
+          한도: budget.세부한도[s] || null
         };
       }),
       구독예상: projection.perSub

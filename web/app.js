@@ -7,6 +7,7 @@ const State = {
   dashMode: 'projected',   // 'projected' = 정기구독 포함, 'actual' = 실사용만
   pastoralView: 'amount',  // 'amount' = 총액(게이지), 'ratio' = 구성비(원그래프)
   showAllSub: false,
+  budgetYear: null,        // 설정 화면에서 보고 있는 예산 연도
   listFilters: { 항목: '전체', 세부: '전체', 기간: '올해', 상태: '전체', from: '', to: '' },
   upload: null,        // { dataUrl, base64, mimeType, form, analysis }
   settle: { tab: '목회비정산', month: '', week: '', candidates: [], selected: {}, method: '수기입력', capture: null }
@@ -1105,27 +1106,68 @@ function renderSettings() {
   const root = el('view-settings');
   const b = State.boot;
   if (!b) { root.innerHTML = ''; return; }
-  const budget = b.budget;
+
+  const budgets = b.budgets || [b.budget];
+  if (!State.budgetYear || !budgets.some(x => x.연도 === State.budgetYear)) {
+    State.budgetYear = (budgets.find(x => x.연도 === b.budget.연도) || budgets[0]).연도;
+  }
+  const budget = budgets.find(x => x.연도 === State.budgetYear) || b.budget;
   const cfg = API.getConfig();
+
+  // 세부 한도: 설정된 것만 목록에 보여 주고, 나머지는 "한도 추가" 에서 고릅니다.
+  const meta = b.meta;
+  const limitNames = meta.subcategories.filter(n => budget.세부한도[n]);
+  const addable = meta.subcategories.filter(n => !budget.세부한도[n]);
+
+  const limitRow = n => {
+    const auto = n === '건강관리' && budget.건강관리자동;
+    return `
+      <div class="limit-row">
+        ${UI.icon(UI.SUB_ICON[n] || 'circle-ellipsis')}
+        <span class="limit-name">${UI.esc(n)}${auto ? '<span class="hint"> 자동 20%</span>' : ''}</span>
+        <input type="number" inputmode="numeric" data-limit="${UI.esc(n)}" value="${budget.세부한도[n]}">
+        <button class="icon-btn danger" data-limit-del="${UI.esc(n)}" aria-label="${UI.esc(n)} 한도 삭제">${UI.icon('trash-2')}</button>
+      </div>`;
+  };
 
   root.innerHTML = `
     <div class="card">
-      <div class="card-head"><div class="card-title">${UI.icon('wallet')} 예산 한도</div>
-        <span class="badge accent">${budget.연도}년</span></div>
+      <div class="card-head">
+        <div class="card-title">${UI.icon('wallet')} 예산 한도</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select class="year-select" id="budget-year">
+            ${budgets.map(x => `<option value="${x.연도}"${x.연도 === State.budgetYear ? ' selected' : ''}>${x.연도}년</option>`).join('')}
+          </select>
+          <button class="icon-btn" id="year-add" aria-label="연도 추가">${UI.icon('plus')}</button>
+        </div>
+      </div>
+
       <label class="field"><span>목회비 연간 한도</span>
         <input type="number" id="b-pastoral" inputmode="numeric" value="${budget.목회비연간한도}"></label>
-      <label class="field"><span>목회비 · 건강관리 한도
-          <span class="hint">비워두면 목회비 한도의 20% 로 자동 계산합니다.</span></span>
-        <input type="number" id="b-health" inputmode="numeric" value="${budget.목회비_건강관리한도}"></label>
       <label class="field"><span>주유비 연간 한도</span>
         <input type="number" id="b-fuel" inputmode="numeric" value="${budget.주유비연간한도}"></label>
+
+      <div class="field">
+        <span>목회비 세부 한도
+          <span class="hint">필요한 항목에만 겁니다. 건강관리는 비워 두면 목회비 한도의 20% 로 자동 계산합니다.</span></span>
+        <div class="limit-list">
+          ${limitNames.length ? limitNames.map(limitRow).join('')
+            : `<p class="form-note" style="margin:2px 0">설정된 세부 한도가 없습니다.</p>`}
+        </div>
+        ${addable.length ? `<button class="btn btn-sm" id="limit-add" style="margin-top:10px">${UI.icon('plus')} 세부 한도 추가</button>` : ''}
+      </div>
+
       <button class="btn btn-primary btn-block" id="b-save">예산 저장</button>
+      <div class="row" style="margin-top:10px">
+        <button class="btn btn-danger btn-sm" id="year-del">${UI.icon('trash-2')} ${budget.연도}년 예산 삭제</button>
+      </div>
       <p class="form-note" style="margin:12px 0 0">매년 1월 1일에 전년도 값이 자동 복사됩니다(Apps Script 트리거).</p>
     </div>
 
     <div class="card">
       <div class="card-head"><div class="card-title">${UI.icon('repeat')} 정기구독</div>
         <button class="btn btn-sm" id="sub-add">${UI.icon('plus')} 추가</button></div>
+      <p class="form-note" style="margin:-6px 0 12px">항목을 탭하면 수정하거나 삭제할 수 있습니다.</p>
       <div class="list">
         ${b.subscriptions.length ? b.subscriptions.map(s => `
           <button class="item-card" data-sub-edit="${UI.esc(s.구독ID)}">
@@ -1137,8 +1179,10 @@ function renderSettings() {
               <div class="item-badges">
                 <span class="badge ${s.활성상태 === '사용중' ? 'ok' : ''}">${UI.esc(s.활성상태)}</span>
                 <span class="badge">${UI.esc(s.시작월)} ~ ${UI.esc(s.종료월 || '계속')}</span>
+                ${s.연결지출건수 ? `<span class="badge accent">지출 ${s.연결지출건수}건 연결</span>` : ''}
               </div>
             </div>
+            ${UI.icon('chevron-right')}
           </button>`).join('')
           : `<div class="empty">${UI.icon('inbox')}등록된 정기구독이 없습니다.</div>`}
       </div>
@@ -1160,20 +1204,78 @@ function renderSettings() {
     </div>`;
 
   UI.refreshIcons(root);
+  bindSettings(root, budget, addable);
+}
+
+function bindSettings(root, budget, addable) {
+  const b = State.boot;
+
+  root.querySelector('#budget-year').onchange = ev => {
+    State.budgetYear = Number(ev.target.value);
+    renderSettings();
+  };
+
+  root.querySelector('#year-add').onclick = () => openYearSheet();
 
   root.querySelector('#b-save').onclick = async () => {
+    const limits = {};
+    root.querySelectorAll('[data-limit]').forEach(inp => { limits[inp.dataset.limit] = inp.value; });
     UI.loading(true, '저장 중…');
     try {
       await API.call('updateBudget', {
         연도: budget.연도,
         목회비연간한도: Number(root.querySelector('#b-pastoral').value),
-        목회비_건강관리한도: root.querySelector('#b-health').value,
-        주유비연간한도: Number(root.querySelector('#b-fuel').value)
+        주유비연간한도: Number(root.querySelector('#b-fuel').value),
+        세부한도: limits
       });
       UI.toast('예산을 저장했습니다.');
       await reload();
     } catch (e) { UI.toast(e.message, 'danger'); }
     finally { UI.loading(false); }
+  };
+
+  const addLimit = root.querySelector('#limit-add');
+  if (addLimit) addLimit.onclick = () => openLimitSheet(budget.연도, addable);
+
+  root.querySelectorAll('[data-limit-del]').forEach(btn => {
+    btn.onclick = async () => {
+      const name = btn.dataset.limitDel;
+      const extra = name === '건강관리'
+        ? '\n삭제하면 목회비 한도의 20% 자동 계산으로 돌아갑니다.'
+        : '';
+      if (!await UI.confirmSheet('세부 한도 삭제',
+        `${budget.연도}년 ${name} 한도를 없앱니다.${extra}`, '삭제', true)) return;
+      UI.loading(true, '삭제 중…');
+      try {
+        await API.call('deleteSubLimit', { 연도: budget.연도, 세부항목: name });
+        UI.toast(`${name} 한도를 없앴습니다.`);
+        await reload();
+      } catch (e) { UI.toast(e.message, 'danger'); }
+      finally { UI.loading(false); }
+    };
+  });
+
+  root.querySelector('#year-del').onclick = async () => {
+    const del = async force => API.call('deleteBudgetYear', { 연도: budget.연도, force });
+    UI.loading(true, '삭제 중…');
+    try {
+      await del(false);
+      UI.toast(`${budget.연도}년 예산을 삭제했습니다.`);
+      State.budgetYear = null;
+      await reload();
+    } catch (e) {
+      UI.loading(false);
+      // 그 해에 지출이 있으면 서버가 막습니다. 내용을 그대로 보여 주고 다시 묻습니다.
+      if (!/계속하시겠습니까/.test(e.message)) { UI.toast(e.message, 'danger'); return; }
+      if (!await UI.confirmSheet('예산 연도 삭제', e.message, '삭제', true)) return;
+      UI.loading(true, '삭제 중…');
+      try {
+        await del(true);
+        UI.toast(`${budget.연도}년 예산을 삭제했습니다.`);
+        State.budgetYear = null;
+        await reload();
+      } catch (e2) { UI.toast(e2.message, 'danger'); }
+    } finally { UI.loading(false); }
   };
 
   root.querySelector('#sub-add').onclick = () => openSubscriptionSheet(null);
@@ -1188,7 +1290,7 @@ function renderSettings() {
       UI.loading(true, '내보내는 중…');
       try {
         const res = await API.call('exportCsv', { sheet: btn.dataset.export });
-        const blob = new Blob(['﻿' + res.csv], { type: 'text/csv;charset=utf-8' });
+        const blob = new Blob(['\ufeff' + res.csv], { type: 'text/csv;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = res.filename;
@@ -1211,6 +1313,67 @@ function renderSettings() {
   }).catch(() => {});
 }
 
+/** 세부 한도 추가 시트 */
+function openLimitSheet(year, addable) {
+  const body = UI.openSheet(`
+    <h2 class="sheet-title">${year}년 세부 한도 추가</h2>
+    <label class="field"><span>목회비 세부항목</span>
+      <select id="lm-name">${addable.map(n => `<option>${UI.esc(n)}</option>`).join('')}</select></label>
+    <label class="field"><span>연간 한도</span>
+      <input type="number" id="lm-amt" inputmode="numeric" placeholder="300000"></label>
+    <p class="form-note">연간 누적 기준입니다. 연중에 새로 걸어도 그 해 전체 사용액과 비교합니다.</p>
+    <p class="form-error" id="lm-error" hidden></p>
+    <button class="btn btn-primary btn-block" id="lm-save">추가</button>`);
+
+  UI.refreshIcons(body);
+  body.querySelector('#lm-save').onclick = async () => {
+    const err = body.querySelector('#lm-error');
+    err.hidden = true;
+    UI.loading(true, '저장 중…');
+    try {
+      await API.call('addSubLimit', {
+        연도: year,
+        세부항목: body.querySelector('#lm-name').value,
+        한도: Number(body.querySelector('#lm-amt').value)
+      });
+      UI.closeSheet();
+      UI.toast('세부 한도를 추가했습니다.');
+      await reload();
+    } catch (e) { err.hidden = false; err.textContent = e.message; }
+    finally { UI.loading(false); }
+  };
+}
+
+/** 예산 연도 추가 시트 */
+function openYearSheet() {
+  const exists = (State.boot.budgets || []).map(x => x.연도);
+  const suggest = Math.max(...exists, new Date().getFullYear()) + 1;
+
+  const body = UI.openSheet(`
+    <h2 class="sheet-title">예산 연도 추가</h2>
+    <label class="field"><span>연도</span>
+      <input type="number" id="yr-value" inputmode="numeric" value="${suggest}"></label>
+    <p class="form-note">전년도 한도를 복사해 만듭니다. 만든 뒤 값을 고치시면 됩니다.</p>
+    <p class="form-error" id="yr-error" hidden></p>
+    <button class="btn btn-primary btn-block" id="yr-save">추가</button>`);
+
+  UI.refreshIcons(body);
+  body.querySelector('#yr-save').onclick = async () => {
+    const err = body.querySelector('#yr-error');
+    err.hidden = true;
+    const year = Number(body.querySelector('#yr-value').value);
+    UI.loading(true, '저장 중…');
+    try {
+      await API.call('addBudgetYear', { 연도: year });
+      UI.closeSheet();
+      State.budgetYear = year;
+      UI.toast(`${year}년 예산을 추가했습니다.`);
+      await reload();
+    } catch (e) { err.hidden = false; err.textContent = e.message; }
+    finally { UI.loading(false); }
+  };
+}
+
 function openSubscriptionSheet(sub) {
   const meta = State.boot.meta;
   const s = sub || { 구독ID: '', 구독명: '', 목회비세부항목: '사역도구', 월예상금액: '', 시작월: currentMonthStr(), 종료월: '', 활성상태: '사용중' };
@@ -1229,7 +1392,9 @@ function openSubscriptionSheet(sub) {
       <select id="su-status">
         <option${s.활성상태 === '사용중' ? ' selected' : ''}>사용중</option>
         <option${s.활성상태 === '해지' ? ' selected' : ''}>해지</option>
-      </select></label>
+      </select>
+      <span class="hint">"해지"로 두면 예상액 계산에서는 빠지고 기록은 남습니다.
+        다시 쓸 일이 없으면 아래에서 삭제하십시오.</span></label>
     <p class="form-error" id="su-error" hidden></p>
     <div class="row">
       ${sub ? `<button class="btn btn-danger" id="su-delete">삭제</button>` : ''}
@@ -1261,7 +1426,11 @@ function openSubscriptionSheet(sub) {
 
   const del = body.querySelector('#su-delete');
   if (del) del.onclick = async () => {
-    if (!await UI.confirmSheet('정기구독 삭제', `${s.구독명} 을(를) 삭제합니다.\n이미 등록된 지출 기록은 그대로 남습니다.`, '삭제', true)) return;
+    const linked = s.연결지출건수
+      ? `\n이 구독에 연결된 지출 ${s.연결지출건수}건은 그대로 남습니다(금액·내역 보존).`
+      : '';
+    const msg = `${s.구독명} 을(를) 목록에서 없앱니다.${linked}\n앞으로 대시보드의 "정기구독 포함" 예상액에서 빠집니다.`;
+    if (!await UI.confirmSheet('정기구독 삭제', msg, '삭제', true)) return;
     UI.loading(true, '삭제 중…');
     try {
       await API.call('deleteSubscription', { 구독ID: s.구독ID });

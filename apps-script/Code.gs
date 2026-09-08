@@ -57,7 +57,12 @@ function route_(action, p) {
     case 'deleteSubscription':return deleteSubscription_(p);
 
     case 'getBudget':         return budgetForYear_(p.year);
+    case 'listBudgets':       return { budgets: listBudgets_() };
     case 'updateBudget':      return updateBudget_(p);
+    case 'addBudgetYear':     return addBudgetYear_(p);
+    case 'deleteBudgetYear':  return deleteBudgetYear_(p);
+    case 'addSubLimit':       return addSubLimit_(p);
+    case 'deleteSubLimit':    return deleteSubLimit_(p);
     case 'driveStatus':       return driveStatus_();
     case 'exportCsv':         return exportCsv_(p);
     default:
@@ -74,6 +79,7 @@ function bootstrap_(p) {
     subscriptions: allSubscriptions_(),
     settlements: allSettlements_(),
     budget: budgetForYear_(year),
+    budgets: listBudgets_(),
     meta: {
       categories: CATEGORIES,
       subcategories: SUBCATEGORIES,

@@ -433,3 +433,12 @@ a { color: var(--accent); }
 /* 카드 안에서 한 줄 전체를 쓰는 세그먼트 토글 */
 .segmented.is-block { display: flex; width: 100%; }
 .segmented.is-block button { flex: 1; text-align: center; }
+
+/* ---------- 세부 한도 목록 (설정) ---------- */
+
+.limit-list { display: flex; flex-direction: column; gap: 8px; }
+.limit-row { display: flex; align-items: center; gap: 10px; }
+.limit-row svg { color: var(--text-3); font-size: 16px; flex: none; }
+.limit-name { flex: 1; min-width: 0; font-size: 13.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.limit-row input { width: 116px; flex: none; padding: 8px 10px; font-size: 14px; text-align: right; }
+.icon-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 28%, var(--border)); width: 32px; height: 32px; font-size: 14px; }
