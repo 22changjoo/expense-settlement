@@ -449,3 +449,18 @@ a { color: var(--accent); }
   font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;
   color: var(--text-2);
 }
+
+/* iOS Safari 의 날짜·월 입력은 고유 너비를 가져 컨테이너 밖으로 삐져나옵니다.
+   기본 모양을 끄고 최소 너비를 풀어 카드 안에 맞춥니다. */
+input[type=date], input[type=month], input[type=time] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+input[type=date]::-webkit-date-and-time-value,
+input[type=month]::-webkit-date-and-time-value {
+  text-align: left;
+}
+.field, .row > * { min-width: 0; }

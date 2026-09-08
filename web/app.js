@@ -472,6 +472,13 @@ async function openExpenseDetail(id) {
     <label class="field"><span>사용일자</span><input type="date" id="d-date" value="${UI.esc(e.사용일자)}"></label>
     <label class="field"><span>금액</span><input type="number" id="d-amt" inputmode="numeric" value="${e.금액}"></label>
     <label class="field" id="d-descwrap"><span>인원/내용</span><input type="text" id="d-desc" value="${UI.esc(e.인원_내용)}"></label>
+    <label class="field" id="d-subwrap2"><span>정기구독 연결
+        <span class="hint">연결하면 그 달 예상액이 실제 금액으로 바뀝니다.</span></span>
+      <select id="d-sublink">
+        <option value="">연결 안 함</option>
+        ${(State.boot.subscriptions || []).map(su => `<option value="${UI.esc(su.구독ID)}"${su.구독ID === e.연결구독ID ? ' selected' : ''}>${UI.esc(su.구독명)}${su.활성상태 === '해지' ? ' · 해지' : ''}</option>`).join('')}
+      </select>
+    </label>
     <label class="field"><span>비고</span><textarea id="d-note">${UI.esc(e.비고)}</textarea></label>
     <label class="field"><span>영수증 제출상태</span>
       <select id="d-submitted">
@@ -481,7 +488,6 @@ async function openExpenseDetail(id) {
       ${e.제출일 ? `<span class="hint">제출일 ${UI.dateLabel(e.제출일)}</span>` : ''}
     </label>
     <div class="kv"><span class="k">정산상태</span><span class="v">${UI.esc(e.정산상태)}${e.정산기록ID ? ' · ' + UI.esc(e.정산기록ID) : ''}</span></div>
-    ${e.연결구독ID ? `<div class="kv"><span class="k">연결 정기구독</span><span class="v">${UI.esc(e.연결구독ID)}</span></div>` : ''}
     <div class="spacer"></div>
     <p class="form-error" id="d-error" hidden></p>
     <div class="row">
@@ -492,9 +498,14 @@ async function openExpenseDetail(id) {
   const syncVisibility = () => {
     const cat = body.querySelector('#d-cat').value;
     body.querySelector('#d-subwrap').hidden = cat !== '목회비';
+    body.querySelector('#d-subwrap2').hidden = cat !== '목회비';
     body.querySelector('#d-descwrap').hidden = cat === '주유비';
   };
   body.querySelector('#d-cat').onchange = syncVisibility;
+  body.querySelector('#d-sublink').onchange = ev => {
+    const sub = (State.boot.subscriptions || []).find(x => x.구독ID === ev.target.value);
+    if (sub) body.querySelector('#d-sub').value = sub.목회비세부항목;
+  };
   syncVisibility();
   UI.refreshIcons(body);
 
@@ -523,7 +534,9 @@ async function openExpenseDetail(id) {
       금액: Number(body.querySelector('#d-amt').value),
       인원_내용: body.querySelector('#d-desc').value,
       비고: body.querySelector('#d-note').value,
-      영수증제출상태: body.querySelector('#d-submitted').value
+      영수증제출상태: body.querySelector('#d-submitted').value,
+      연결구독ID: body.querySelector('#d-cat').value === '목회비'
+        ? body.querySelector('#d-sublink').value : ''
     };
     UI.loading(true, '저장 중…');
     try {
@@ -622,18 +635,7 @@ function renderUpload() {
         </div>
       </div>
 
-      ${u.subscriptionMatch && isPastoral ? `
-        <div class="banner">
-          ${UI.icon('repeat')}
-          <div>
-            <div>이 영수증을 <b>${UI.esc(u.subscriptionMatch.구독명)}</b> 정기구독과 연결할까요?<br>
-              <span class="hint">연결하면 이번 달 예상액이 실제 금액으로 바뀝니다.</span></div>
-            <div class="banner-actions">
-              <button class="btn btn-sm ${f.연결구독ID ? 'btn-primary' : ''}" data-sub-link="yes">연결</button>
-              <button class="btn btn-sm ${f.연결구독ID ? '' : 'btn-primary'}" data-sub-link="no">아니오</button>
-            </div>
-          </div>
-        </div>` : ''}
+      ${isPastoral ? subscriptionField(f, u.subscriptionMatch) : ''}
 
       ${isPastoral ? `
         <div class="field"><span>목회비 세부항목 <span class="hint">필수</span></span>
@@ -672,6 +674,36 @@ function renderUpload() {
 
   UI.refreshIcons(root);
   bindUploadForm(root);
+}
+
+/**
+ * 정기구독 연결 필드.
+ * 자동으로 찾았으면 미리 골라 두고, 못 찾았어도 직접 고를 수 있게 항상 보여 줍니다.
+ * (온라인 결제 전표는 상호가 결제대행사로 찍혀 자동 매칭이 빗나갈 수 있습니다.)
+ */
+function subscriptionField(f, match) {
+  const subs = State.boot.subscriptions || [];
+  if (!subs.length) return '';
+
+  const month = String(f.사용일자 || '').slice(0, 7);
+  const inRange = s => (!s.시작월 || month >= s.시작월) && (!s.종료월 || month <= s.종료월);
+  const sorted = subs.slice().sort((a, b) => {
+    const ar = inRange(a) ? 0 : 1, br = inRange(b) ? 0 : 1;
+    return ar - br || a.구독명.localeCompare(b.구독명, 'ko');
+  });
+
+  const auto = match && f.연결구독ID === match.구독ID;
+  return `
+    <div class="field">
+      <span>정기구독 연결 <span class="hint">해당하면 고르십시오. 그 달 예상액이 실제 금액으로 바뀝니다.</span></span>
+      <select id="f-sub">
+        <option value="">연결 안 함</option>
+        ${sorted.map(s => `<option value="${UI.esc(s.구독ID)}"${s.구독ID === f.연결구독ID ? ' selected' : ''}>
+          ${UI.esc(s.구독명)}${inRange(s) ? '' : ' · 기간 밖'}${s.활성상태 === '해지' ? ' · 해지' : ''}
+        </option>`).join('')}
+      </select>
+      ${auto ? `<span class="hint" style="color:var(--accent)">영수증에서 자동으로 찾았습니다.</span>` : ''}
+    </div>`;
 }
 
 /** 건강관리 미니 게이지 — 저장 전에 한도 초과 여부를 바로 확인합니다. */
@@ -714,13 +746,16 @@ async function handleReceiptFile(file) {
       analysisError,
       subscriptionMatch,
       form: {
-        항목: cat,
-        목회비세부항목: cat === '목회비' ? (analysis?.suggested_subcategory || '') : '',
+        항목: subscriptionMatch ? '목회비' : cat,
+        // 정기구독을 찾았으면 세부항목은 구독 설정을 따릅니다(영수증 추론보다 정확합니다).
+        목회비세부항목: subscriptionMatch
+          ? subscriptionMatch.목회비세부항목
+          : (cat === '목회비' ? (analysis?.suggested_subcategory || '') : ''),
         사용일자: analysis?.date || todayStr(),
         금액: analysis?.amount || '',
-        인원_내용: '',
+        인원_내용: subscriptionMatch ? subscriptionMatch.구독명 : '',
         비고: '',
-        연결구독ID: '',
+        연결구독ID: subscriptionMatch ? subscriptionMatch.구독ID : '',
         noteOpen: false
       }
     };
@@ -748,18 +783,17 @@ function bindUploadForm(root) {
     btn.onclick = () => { f.목회비세부항목 = btn.dataset.sub; renderUpload(); };
   });
 
-  root.querySelectorAll('[data-sub-link]').forEach(btn => {
-    btn.onclick = () => {
-      if (btn.dataset.subLink === 'yes') {
-        f.연결구독ID = u.subscriptionMatch.구독ID;
-        f.목회비세부항목 = u.subscriptionMatch.목회비세부항목 || f.목회비세부항목;
-        if (!f.인원_내용) f.인원_내용 = u.subscriptionMatch.구독명;
-      } else {
-        f.연결구독ID = '';
-      }
-      renderUpload();
-    };
-  });
+  const subSel = root.querySelector('#f-sub');
+  if (subSel) subSel.onchange = () => {
+    f.연결구독ID = subSel.value;
+    const sub = (State.boot.subscriptions || []).find(x => x.구독ID === f.연결구독ID);
+    if (sub) {
+      // 구독을 고르면 세부항목과 내용을 구독 설정에 맞춥니다.
+      f.목회비세부항목 = sub.목회비세부항목 || f.목회비세부항목;
+      if (!String(f.인원_내용).trim()) f.인원_내용 = sub.구독명;
+    }
+    renderUpload();
+  };
 
   const date = root.querySelector('#f-date');
   if (date) date.onchange = () => { f.사용일자 = date.value; };
@@ -1505,7 +1539,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.08-5';
+const APP_VERSION = '2026.09.08-6';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
