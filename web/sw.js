@@ -2,10 +2,11 @@
  * 앱 셸만 캐시합니다. 데이터는 항상 네트워크에서 가져옵니다
  * (Apps Script 응답을 캐시하면 오래된 잔액이 보일 수 있습니다).
  */
-const CACHE = 'expense-shell-v1';
+const CACHE = 'expense-shell-v2';
 const SHELL = [
   './', './index.html', './styles.css', './api.js', './ui.js', './app.js',
-  './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'
+  './manifest.webmanifest', './icons/icon.svg',
+  './icons/icon-192.png', './icons/icon-512.png'
 ];
 
 self.addEventListener('install', ev => {

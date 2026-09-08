@@ -1,0 +1,17 @@
+<!--
+  앱 아이콘 원본. Lucide "receipt-text" (ISC License, https://lucide.dev) 를
+  앱 색상에 맞춰 구성한 것으로, 맨 아랫줄만 강조색으로 두어 금액 줄을 나타냅니다.
+  PNG 는 이 도형을 캔버스에 그려 만듭니다 (README 참고).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0f1115"/>
+  <g transform="translate(113.5 113.5) scale(11.9375)"
+     fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke="#f6f7f9">
+      <path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/>
+      <path d="M14 8H8"/>
+      <path d="M16 12H8"/>
+    </g>
+    <path d="M13 16H8" stroke="#2f6bff"/>
+  </g>
+</svg>
