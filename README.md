@@ -167,6 +167,12 @@ cd apps-script && clasp create --type sheets --title "경비정산시스템" && 
   상세 화면에서는 Apps Script 를 거쳐 이미지를 받아 보여 줍니다.
 - 업로드 전에 이미지를 긴 변 1600px JPEG 로 줄여 보냅니다(전송량·API 비용 절감).
 - 서비스 워커는 앱 셸(HTML/CSS/JS)만 캐시합니다. 잔액·목록은 항상 서버에서 새로 받습니다.
+- GitHub Pages 는 `cache-control: max-age=600` 을 보냅니다. 그대로 두면 배포 후 10분 동안
+  브라우저가 옛 파일을 재검증 없이 내주어, 새 코드가 올라가 있어도 옛 코드가 실행됩니다.
+  그래서 서비스 워커는 설치할 때도 실행 중에도 HTTP 캐시를 건너뛰고 원본에 직접 확인하며,
+  `sw.js` 자체도 `updateViaCache: 'none'` 으로 등록합니다.
+- 화면이 비거나 이상하면 설정 → **최신 버전으로 새로고침** 을 누르십시오. 서비스 워커
+  등록과 캐시를 모두 지우고 다시 받습니다.
 - 자동 분류는 초안입니다. 저장 전에 항상 화면에서 확인·수정하십시오.
 - 앱 아이콘은 Lucide 의 `receipt-text` (ISC License) 를 앱 색상에 맞춰 구성한 것입니다.
   원본은 `web/icons/icon.svg` 이며, PNG 세 종은 이 도형을 캔버스에 그려 만듭니다.
@@ -180,5 +186,5 @@ cd apps-script && clasp create --type sheets --title "경비정산시스템" && 
 
 | 대상 | 반영 방법 |
 |---|---|
-| `web/` | `git push` — Actions 가 자동 배포합니다 |
+| `web/` | `git push` — Actions 가 자동 배포합니다. `web/app.js` 의 `APP_VERSION` 을 함께 올리면 설정 화면에서 무엇이 돌고 있는지 확인할 수 있습니다 |
 | `apps-script/` | `cd apps-script && clasp push` 후, Apps Script 에서 **배포 관리 → 편집(연필) → 버전: 새 버전 → 배포**. 이 단계를 빠뜨리면 웹앱 URL 은 예전 코드를 계속 실행합니다 |

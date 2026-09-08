@@ -1248,6 +1248,7 @@ function renderSettings() {
       <div class="card-head"><div class="card-title">${UI.icon('hard-drive')} 연결 상태</div></div>
       <div id="drive-status"><p class="form-note" style="margin:0">확인 중…</p></div>
       <div class="spacer"></div>
+      <div class="kv"><span class="k">앱 버전</span><span class="v">${APP_VERSION}</span></div>
       <div class="kv"><span class="k">웹앱 URL</span><span class="v" style="font-size:12px">${UI.esc(cfg.url)}</span></div>
       <button class="btn btn-block" id="app-refresh" style="margin-top:12px">${UI.icon('refresh-cw')} 최신 버전으로 새로고침</button>
       <button class="btn btn-block" id="reset-conn" style="margin-top:8px">${UI.icon('unplug')} 연결 정보 다시 입력</button>
@@ -1502,9 +1503,19 @@ function openSubscriptionSheet(sub) {
 
 /* ---------------- 시작 ---------------- */
 
+/** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
+const APP_VERSION = '2026.09.08-4';
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // updateViaCache:'none' — sw.js 자체도 HTTP 캐시에서 꺼내 쓰지 않습니다.
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then(reg => {
+        reg.update().catch(() => {});
+        // 새 워커가 대기 중이면 바로 넘겨받게 합니다.
+        if (reg.waiting) reg.waiting.postMessage('skipWaiting');
+      })
+      .catch(() => {});
   });
 }
 
