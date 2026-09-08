@@ -77,9 +77,14 @@ cd apps-script && clasp create --type sheets --title "경비정산시스템" && 
 
 ### 1-4. 프런트엔드 배포
 
-`web/` 폴더 내용을 GitHub 저장소에 올리고 **Settings → Pages** 에서 브랜치를 지정합니다.
+**배포 주소: https://22changjoo.github.io/expense-settlement/**
+
+`main` 에 푸시하면 `.github/workflows/pages.yml` 이 `web/` 폴더를 GitHub Pages 로
+배포합니다. (Pages 의 폴더 소스는 루트나 `/docs` 만 지원해서, 디렉터리 구조를
+유지하려고 Actions 방식을 씁니다.)
+
 배포된 주소를 열면 연결 화면이 뜹니다 — 웹앱 URL 과 API_TOKEN 을 입력하면 끝입니다.
-(두 값은 브라우저 `localStorage` 에만 저장됩니다.)
+두 값은 그 브라우저의 `localStorage` 에만 저장되며 저장소에는 들어가지 않습니다.
 
 모바일에서는 Safari/Chrome 의 **홈 화면에 추가** 로 설치합니다.
 
@@ -143,3 +148,13 @@ cd apps-script && clasp create --type sheets --title "경비정산시스템" && 
 - 업로드 전에 이미지를 긴 변 1600px JPEG 로 줄여 보냅니다(전송량·API 비용 절감).
 - 서비스 워커는 앱 셸(HTML/CSS/JS)만 캐시합니다. 잔액·목록은 항상 서버에서 새로 받습니다.
 - 자동 분류는 초안입니다. 저장 전에 항상 화면에서 확인·수정하십시오.
+- 저장소는 공개이지만 접근 토큰·API 키·시트 ID 는 코드에 없습니다. 데이터 접근은
+  전적으로 `API_TOKEN` 이 막습니다. 토큰이 새어 나갔다고 판단되면 Apps Script 에서
+  `resetApiToken` 을 실행하고 앱에서 새 토큰을 입력하십시오.
+
+## 6. 코드를 고친 뒤
+
+| 대상 | 반영 방법 |
+|---|---|
+| `web/` | `git push` — Actions 가 자동 배포합니다 |
+| `apps-script/` | `cd apps-script && clasp push` 후, Apps Script 에서 **배포 관리 → 편집(연필) → 버전: 새 버전 → 배포**. 이 단계를 빠뜨리면 웹앱 URL 은 예전 코드를 계속 실행합니다 |
