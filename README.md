@@ -187,4 +187,23 @@ cd apps-script && clasp create --type sheets --title "경비정산시스템" && 
 | 대상 | 반영 방법 |
 |---|---|
 | `web/` | `git push` — Actions 가 자동 배포합니다. `web/app.js` 의 `APP_VERSION` 을 함께 올리면 설정 화면에서 무엇이 돌고 있는지 확인할 수 있습니다 |
-| `apps-script/` | `cd apps-script && clasp push` 후, Apps Script 에서 **배포 관리 → 편집(연필) → 버전: 새 버전 → 배포**. 이 단계를 빠뜨리면 웹앱 URL 은 예전 코드를 계속 실행합니다 |
+| `apps-script/` | `cd apps-script && clasp push` 후 아래 배포 갱신 |
+
+#### Apps Script 배포 갱신
+
+`clasp push` 는 코드를 올릴 뿐이고, **웹앱 URL 은 배포된 버전에 고정**됩니다.
+푸시만 하면 URL 은 계속 옛 코드를 실행하므로 반드시 배포를 갱신하십시오.
+
+```bash
+cd apps-script
+clasp push
+clasp list-deployments                       # 배포 ID 확인
+clasp deploy --deploymentId <배포ID> --description "무엇을 바꿨는지"
+```
+
+Apps Script 편집기에서 하려면 **배포 관리 → 편집(연필) → 버전: 새 버전 → 배포** 입니다.
+
+> **배포는 하나만 유지하십시오.** 배포를 여러 개 만들면 각각 다른 코드 버전에 고정되어,
+> 기기마다 다른 URL 을 쓰게 되고 한쪽만 옛 코드로 도는 일이 생깁니다.
+> `clasp list-deployments` 결과에서 `@HEAD` 는 Apps Script 가 자동으로 두는 것이라
+> 삭제되지 않으며, `/exec` 로 쓰이지 않으니 그대로 두시면 됩니다.
