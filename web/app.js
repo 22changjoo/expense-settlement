@@ -7,6 +7,7 @@ const State = {
   dashMode: 'projected',   // 'projected' = 정기구독 포함, 'actual' = 실사용만
   pastoralView: 'amount',  // 'amount' = 총액(게이지), 'ratio' = 구성비(원그래프)
   showAllSub: false,
+  showProjection: false,   // 정기구독 예상 내역 펼침 여부
   budgetYear: null,        // 설정 화면에서 보고 있는 예산 연도
   listFilters: { 항목: '전체', 세부: '전체', 기간: '올해', 상태: '전체', from: '', to: '' },
   upload: null,        // { dataUrl, base64, mimeType, form, analysis }
@@ -227,8 +228,7 @@ function renderDashboard() {
           <span>${UI.pct(used, p.한도)}%</span>
           <span>잔액 ${UI.won(remain)}</span>
         </div>
-        ${projected && p.예상포함 > p.실사용
-          ? `<p class="form-note" style="margin:10px 0 0">예상 포함 ${UI.won(p.예상포함)} (실사용 ${UI.won(p.실사용)}) — 점선 구간이 아직 영수증이 없는 정기구독 예상액입니다.</p>` : ''}
+        ${projected ? projectionDetail(p) : ''}
         <div class="breakdown">
           ${shown.map(bdRow).join('')}
           <button class="link-btn" id="toggle-sub" style="align-self:flex-start;font-size:13px">
@@ -288,6 +288,9 @@ function renderDashboard() {
     State.pastoralView = btn.dataset.pview;
     renderDashboard();
   };
+  const projToggle = root.querySelector('#proj-toggle');
+  if (projToggle) projToggle.onclick = () => { State.showProjection = !State.showProjection; renderDashboard(); };
+
   const toggleSub = root.querySelector('#toggle-sub');
   if (toggleSub) toggleSub.onclick = () => { State.showAllSub = !State.showAllSub; renderDashboard(); };
   root.querySelectorAll('[data-alert]').forEach(btn => {
@@ -326,6 +329,56 @@ function ratioBody(subs, total) {
     ${UI.donut(slices)}
     <div class="legend">${legend}</div>
     <p class="form-note" style="margin:12px 0 0">세부항목 합계 ${UI.won(sum)} 기준 구성비입니다.</p>`;
+}
+
+/**
+ * 정기구독 예상액 내역.
+ * "예상 포함" 이 얼마인지만 보여 주면 어느 구독이 얼마나 남았는지 알 수 없어,
+ * 구독별로 남은 달과 금액을 펼쳐 볼 수 있게 합니다.
+ */
+function projectionDetail(p) {
+  const items = Object.values(p.구독예상 || {});
+  const pending = p.예상포함 - p.실사용;
+  if (!items.length || pending <= 0) return '';
+
+  // 연속한 달은 묶어서 짧게 적습니다. [1,2,3,7] → "1~3월, 7월"
+  const monthLabel = list => {
+    const nums = (list || []).map(m => Number(m.slice(5, 7))).sort((a, b) => a - b);
+    if (!nums.length) return '';
+    const parts = [];
+    let start = nums[0], prev = nums[0];
+    for (let i = 1; i <= nums.length; i++) {
+      if (nums[i] === prev + 1) { prev = nums[i]; continue; }
+      parts.push(start === prev ? `${start}월` : `${start}~${prev}월`);
+      start = prev = nums[i];
+    }
+    return parts.join(', ');
+  };
+
+  const rows = items
+    .sort((a, b) => b.금액 - a.금액)
+    .map(s => `
+      <div class="proj-row">
+        ${UI.icon(UI.SUB_ICON[s.목회비세부항목] || 'repeat')}
+        <div class="proj-body">
+          <div class="proj-name">${UI.esc(s.구독명)}</div>
+          <div class="proj-months">${UI.esc(monthLabel(s.예상월목록))} · ${s.개월수}개월 × ${UI.num(s.월예상금액)}원${
+            s.실제등록월.length ? ` <span class="proj-done">(${UI.esc(monthLabel(s.실제등록월))} 영수증 등록됨)</span>` : ''}</div>
+        </div>
+        <div class="proj-amt">${UI.num(s.금액)}</div>
+      </div>`).join('');
+
+  return `
+    <div class="projection">
+      <button class="proj-toggle" id="proj-toggle" aria-expanded="${State.showProjection}">
+        ${UI.icon(State.showProjection ? 'chevron-down' : 'chevron-right')}
+        <span>정기구독 예상액</span>
+        <span class="proj-total">${UI.won(pending)}</span>
+      </button>
+      ${State.showProjection ? `<div class="proj-list">${rows}
+        <p class="form-note" style="margin:10px 0 0">영수증을 등록하고 그 구독에 연결하면 해당 달은 실제 금액으로 바뀝니다.</p>
+      </div>` : ''}
+    </div>`;
 }
 
 function alertRow(iconName, label, count, variant, filter) {
@@ -1539,7 +1592,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.08-6';
+const APP_VERSION = '2026.09.08-7';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

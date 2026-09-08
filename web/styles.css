@@ -58,6 +58,8 @@ html, body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* 한글이 단어 중간에서 잘리지 않도록 어절 단위로 줄바꿈합니다. */
+  word-break: keep-all;
 }
 
 body { overscroll-behavior-y: none; }
@@ -464,3 +466,26 @@ input[type=month]::-webkit-date-and-time-value {
   text-align: left;
 }
 .field, .row > * { min-width: 0; }
+
+/* ---------- 정기구독 예상 내역 ---------- */
+
+.projection { margin-top: 12px; }
+.proj-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 0; cursor: pointer;
+  font: inherit; font-size: 13px; color: var(--text-2); text-align: left;
+}
+.proj-toggle svg { font-size: 15px; flex: none; }
+.proj-toggle > span:first-of-type { flex: 1; min-width: 0; }
+.proj-total { font-weight: 620; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.proj-list { display: flex; flex-direction: column; gap: 2px; padding: 10px 2px 0; }
+.proj-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.proj-row:last-of-type { border-bottom: 0; }
+.proj-row svg { color: var(--text-3); font-size: 16px; flex: none; margin-top: 2px; }
+.proj-body { flex: 1; min-width: 0; }
+.proj-name { font-size: 13.5px; font-weight: 550; }
+.proj-months { font-size: 12px; color: var(--text-3); margin-top: 2px; overflow-wrap: anywhere; }
+.proj-done { color: var(--ok); }
+.proj-amt { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; font-size: 13.5px; }

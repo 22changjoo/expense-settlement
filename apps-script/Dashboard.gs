@@ -164,15 +164,25 @@ function subscriptionProjection_(year, expenses, subs) {
 
   subs.forEach(function (s) {
     if (s.활성상태 !== '사용중') return;
-    var months = 0;
+    var pending = [];      // 아직 영수증이 없어 예상액으로 잡히는 달
+    var recorded = [];     // 실제 지출이 연결된 달
     monthsOfYear_(year).forEach(function (m) {
       if (!subActiveInMonth_({ '시작월': s.시작월, '종료월': s.종료월 }, m)) return;
-      if (bySubMonth[s.구독ID + '|' + m]) return; // 실제 데이터가 있으므로 예상액 무시
-      months++;
+      if (bySubMonth[s.구독ID + '|' + m]) recorded.push(m);   // 실제 데이터가 있으므로 예상액 무시
+      else pending.push(m);
     });
+    var months = pending.length;
     var amount = months * s.월예상금액;
     if (amount <= 0) return;
-    perSub[s.구독ID] = { 구독명: s.구독명, 개월수: months, 금액: amount };
+    perSub[s.구독ID] = {
+      구독명: s.구독명,
+      목회비세부항목: s.목회비세부항목,
+      월예상금액: s.월예상금액,
+      개월수: months,
+      금액: amount,
+      예상월목록: pending,
+      실제등록월: recorded
+    };
     var key = SUBCATEGORIES.indexOf(s.목회비세부항목) >= 0 ? s.목회비세부항목 : '기타';
     bySubcategory[key] += amount;
     total += amount;
