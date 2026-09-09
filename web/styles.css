@@ -511,3 +511,14 @@ input[type=month]::-webkit-date-and-time-value {
 .proj-months { font-size: 12px; color: var(--text-3); margin-top: 2px; overflow-wrap: anywhere; }
 .proj-done { color: var(--ok); }
 .proj-amt { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; font-size: 13.5px; }
+
+/* 뒤에서 갱신하는 중임을 알립니다. */
+.icon-btn.is-busy { color: var(--accent); }
+.icon-btn.is-busy svg { animation: spin 1s linear infinite; }
+
+.toast-action { display: flex; align-items: center; gap: 12px; padding-right: 8px; }
+.toast-action button {
+  padding: 5px 12px; border-radius: 999px; border: 0;
+  background: var(--bg); color: var(--text);
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}

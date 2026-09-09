@@ -1,6 +1,7 @@
 /** 시트 접근 공통 레이어 — 열 위치는 항상 헤더 이름으로 해석합니다. */
 
 function sheet_(name) {
+  if (MEMO_.sheets[name]) return MEMO_.sheets[name];
   var ss = spreadsheet_();
   var sh = ss.getSheetByName(name);
   if (!sh) {
@@ -8,11 +9,13 @@ function sheet_(name) {
     sh.getRange(1, 1, 1, HEADERS[name].length).setValues([HEADERS[name]]);
     sh.setFrozenRows(1);
   }
+  MEMO_.sheets[name] = sh;
   return sh;
 }
 
-/** 시트 전체를 객체 배열로 읽습니다. */
+/** 시트 전체를 객체 배열로 읽습니다. 같은 실행 안에서는 한 번만 읽습니다. */
 function readSheet_(name) {
+  if (MEMO_.values[name]) return MEMO_.values[name];
   var sh = sheet_(name);
   var values = sh.getDataRange().getValues();
   if (values.length < 2) return { header: values[0] || HEADERS[name], rows: [] };
@@ -25,7 +28,8 @@ function readSheet_(name) {
     for (var c = 0; c < header.length; c++) obj[header[c]] = raw[c];
     rows.push(obj);
   }
-  return { header: header, rows: rows };
+  MEMO_.values[name] = { header: header, rows: rows };
+  return MEMO_.values[name];
 }
 
 function colIndex_(header, name) {
@@ -43,6 +47,7 @@ function appendRow_(name, obj) {
     return obj[h] === undefined || obj[h] === null ? '' : obj[h];
   });
   sh.appendRow(row);
+  invalidate_(name);
   return sh.getLastRow();
 }
 
@@ -56,10 +61,12 @@ function updateRow_(name, rowNumber, patch) {
     if (idx < 0) return;
     sh.getRange(rowNumber, idx + 1).setValue(patch[key]);
   });
+  invalidate_(name);
 }
 
 function deleteRow_(name, rowNumber) {
   sheet_(name).deleteRow(rowNumber);
+  invalidate_(name);
 }
 
 function findRow_(name, key, value) {

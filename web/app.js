@@ -24,25 +24,81 @@ const el = id => document.getElementById(id);
 
 /* ---------------- 부팅 ---------------- */
 
+/**
+ * 지난번에 받은 데이터를 이 기기에 남겨 둡니다.
+ *
+ * Apps Script 응답은 서버 처리에만 2~4초가 걸려, 앱을 열 때마다 빈 화면을
+ * 그만큼 봐야 했습니다. 저장해 둔 값으로 먼저 그리고 뒤에서 새로 받아 옵니다.
+ */
+const CACHE_KEY = 'exp.snapshot';
+const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 14;   // 2주 지난 값은 쓰지 않습니다
+
+function saveSnapshot(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), year: State.year, data }));
+  } catch (e) { /* 저장 공간이 없으면 그냥 넘어갑니다 */ }
+}
+
+function loadSnapshot() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const snap = JSON.parse(raw);
+    if (!snap || !snap.data || Date.now() - snap.at > CACHE_MAX_AGE) return null;
+    return snap;
+  } catch (e) { return null; }
+}
+
+function clearSnapshot() {
+  try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
+}
+
 async function boot() {
   if (!API.isConfigured()) { showOnboarding(); return; }
   el('onboarding').hidden = true;
   el('app').hidden = false;
+
+  const snap = loadSnapshot();
+  if (snap) {
+    // 저장해 둔 값으로 즉시 그리고, 최신 값은 뒤에서 받아 옵니다.
+    State.boot = snap.data;
+    State.year = snap.year || State.boot.meta.year;
+    renderYearSelect();
+    render();
+    setStale(true);
+    reload({ silent: true });
+    return;
+  }
   await reload();
 }
 
-async function reload() {
-  UI.loading(true, '불러오는 중…');
+/** 갱신 중임을 새로고침 아이콘으로 알립니다. */
+function setStale(on) {
+  el('refresh-btn').classList.toggle('is-busy', !!on);
+}
+
+async function reload(opts = {}) {
+  const silent = !!opts.silent;
+  if (silent) setStale(true);
+  else UI.loading(true, '불러오는 중…');
   try {
-    State.boot = await API.call('bootstrap', { year: State.year });
-    State.year = State.boot.meta.year;
+    const data = await API.call('bootstrap', { year: State.year });
+    State.boot = data;
+    State.year = data.meta.year;
+    saveSnapshot(data);
     renderYearSelect();
     render();
   } catch (e) {
-    UI.toast(e.message, 'danger');
-    if (/토큰|URL|연결하지/.test(e.message)) showOnboarding(e.message);
+    if (silent) {
+      // 저장해 둔 값이 이미 화면에 있으므로 조용히 알리기만 합니다.
+      UI.toast('최신 내용을 받지 못했습니다. 저장된 내용을 보고 계십니다.', 'danger');
+    } else {
+      UI.toast(e.message, 'danger');
+      if (/토큰|URL|연결하지/.test(e.message)) showOnboarding(e.message);
+    }
   } finally {
-    UI.loading(false);
+    setStale(false);
+    if (!silent) UI.loading(false);
   }
 }
 
@@ -63,6 +119,7 @@ el('ob-save').onclick = async () => {
   const token = el('ob-token').value.trim();
   if (!url || !token) { el('ob-error').hidden = false; el('ob-error').textContent = '두 값을 모두 입력하세요.'; return; }
   API.setConfig(url, token);
+  clearSnapshot();
   UI.loading(true, '연결 확인 중…');
   try {
     await API.call('ping');
@@ -148,6 +205,7 @@ function renderCrash(view, error) {
 /** 서비스 워커 캐시를 비우고 다시 받아옵니다. */
 async function hardReload() {
   UI.loading(true, '최신 버전을 받는 중…');
+  clearSnapshot();
   try {
     if ('serviceWorker' in navigator) {
       for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
@@ -1592,7 +1650,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.09-1';
+const APP_VERSION = '2026.09.09-2';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -1604,7 +1662,23 @@ if ('serviceWorker' in navigator) {
         if (reg.waiting) reg.waiting.postMessage('skipWaiting');
       })
       .catch(() => {});
+
+    // 새 파일이 확인되면 알려 주고, 새로고침은 사용자가 고르게 둡니다.
+    navigator.serviceWorker.addEventListener('message', ev => {
+      if (ev.data && ev.data.type === 'shell-updated') showUpdateToast();
+    });
   });
+}
+
+let updateToastShown = false;
+function showUpdateToast() {
+  if (updateToastShown) return;
+  updateToastShown = true;
+  const el = document.createElement('div');
+  el.className = 'toast toast-action';
+  el.innerHTML = '새 버전이 준비됐습니다 <button type="button">새로고침</button>';
+  el.querySelector('button').onclick = () => location.reload();
+  document.getElementById('toasts').appendChild(el);
 }
 
 UI.refreshIcons(document.body);

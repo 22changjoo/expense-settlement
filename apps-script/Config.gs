@@ -49,8 +49,25 @@ function prop_(key, fallback) {
   return (v === null || v === '') ? (fallback === undefined ? '' : fallback) : v;
 }
 
+/**
+ * 실행 단위 캐시.
+ *
+ * 웹앱 요청 하나는 독립된 실행이므로, 그 안에서는 스프레드시트를 다시 열거나
+ * 같은 시트를 다시 읽을 이유가 없습니다. bootstrap 한 번에 시트를 열 번 넘게
+ * 읽던 것이 응답을 5초 넘게 끌었습니다.
+ */
+var MEMO_ = { ss: null, sheets: {}, values: {} };
+
 function spreadsheet_() {
+  if (MEMO_.ss) return MEMO_.ss;
   var id = prop_('SPREADSHEET_ID');
   if (!id) throw new Error('SPREADSHEET_ID 스크립트 속성이 설정되지 않았습니다. setupScriptProperties() 를 먼저 실행하세요.');
-  return SpreadsheetApp.openById(id);
+  MEMO_.ss = SpreadsheetApp.openById(id);
+  return MEMO_.ss;
+}
+
+/** 시트를 고쳤으면 그 시트의 캐시를 버립니다. 이름을 주지 않으면 전부 버립니다. */
+function invalidate_(name) {
+  if (name) { delete MEMO_.values[name]; delete MEMO_.sheets[name]; }
+  else { MEMO_.values = {}; MEMO_.sheets = {}; }
 }

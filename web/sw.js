@@ -7,7 +7,7 @@
  * 새 app.js 가 올라가 있어도 옛 코드가 실행됩니다. 그래서 이 워커는
  * 설치할 때도 실행 중에도 HTTP 캐시를 건너뛰고 원본에 직접 물어봅니다.
  */
-const CACHE = 'expense-shell-v8';
+const CACHE = 'expense-shell-v9';
 const SHELL = [
   './', './index.html', './styles.css', './api.js', './ui.js', './app.js',
   './manifest.webmanifest', './icons/icon.svg',
@@ -45,19 +45,51 @@ self.addEventListener('fetch', ev => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;               // CDN·Apps Script 는 통과
 
-  // 'no-cache' = HTTP 캐시를 쓰되 매번 원본에 확인합니다(ETag 로 304 면 가볍습니다).
-  ev.respondWith(
-    fromNetwork(req.url, 'no-cache')
-      .then(res => {
-        if (res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
-        }
-        return res;
-      })
-      .catch(() => caches.match(req).then(hit => hit || caches.match('./index.html')))
-  );
+  ev.respondWith(serveShell(ev, req));
 });
+
+/**
+ * 캐시에 있으면 곧바로 내주고, 갱신은 뒤에서 합니다.
+ *
+ * 예전에는 매번 원본에 먼저 확인했는데, 파일 하나하나가 왕복을 기다리느라
+ * 앱을 열 때마다 시작이 느렸습니다. 이제는 즉시 뜨고, 새 파일이 확인되면
+ * 다음 실행부터 반영되며 열려 있는 화면에는 알림을 보냅니다.
+ */
+async function serveShell(ev, req) {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(req);
+
+  if (cached) {
+    ev.waitUntil(revalidate(cache, req, cached));
+    return cached;
+  }
+
+  try {
+    const res = await fromNetwork(req.url, 'no-cache');
+    if (res.ok) cache.put(req, res.clone());
+    return res;
+  } catch (e) {
+    return (await cache.match('./index.html')) || Response.error();
+  }
+}
+
+async function revalidate(cache, req, cached) {
+  try {
+    const fresh = await fromNetwork(req.url, 'no-cache');
+    if (!fresh.ok) return;
+    const before = cached.headers.get('etag') || cached.headers.get('last-modified');
+    const after = fresh.headers.get('etag') || fresh.headers.get('last-modified');
+    await cache.put(req, fresh.clone());
+    if (before && after && before !== after) await notifyUpdate();
+  } catch (e) {
+    // 오프라인이면 캐시에 있던 것을 계속 씁니다.
+  }
+}
+
+async function notifyUpdate() {
+  const clients = await self.clients.matchAll({ type: 'window' });
+  clients.forEach(c => c.postMessage({ type: 'shell-updated' }));
+}
 
 /** 앱에서 즉시 갱신을 요청할 때 씁니다. */
 self.addEventListener('message', ev => {

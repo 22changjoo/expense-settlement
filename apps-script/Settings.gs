@@ -48,6 +48,7 @@ function ensureSubLimitColumn_(name) {
 
   var next = sh.getLastColumn() + 1;
   sh.getRange(1, next).setValue(col);
+  invalidate_(CFG.SHEET_BUDGET);      // 열이 늘었으므로 헤더를 다시 읽어야 합니다
   return next;
 }
 
@@ -55,6 +56,7 @@ function setSubLimit_(year, name, value) {
   var col = ensureSubLimitColumn_(name);
   var found = budgetRow_(year);
   sheet_(CFG.SHEET_BUDGET).getRange(found.row._row, col).setValue(num_(value));
+  invalidate_(CFG.SHEET_BUDGET);
 }
 
 /** 해당 연도의 칸만 비웁니다(열은 남깁니다). */
@@ -66,6 +68,7 @@ function clearSubLimitCell_(year, name) {
   if (idx < 0) return;
   var found = budgetRow_(year);
   sh.getRange(found.row._row, idx + 1).setValue('');
+  invalidate_(CFG.SHEET_BUDGET);
 }
 
 /** 세부 한도 추가 — 이미 있으면 값을 덮어씁니다. */
@@ -99,7 +102,7 @@ function deleteSubLimit_(p) {
   clearSubLimitCell_(year, name);
 
   var stillUsed = readSheet_(CFG.SHEET_BUDGET).rows.some(function (r) { return num_(r[col]) > 0; });
-  if (!stillUsed) sh.deleteColumn(idx + 1);
+  if (!stillUsed) { sh.deleteColumn(idx + 1); invalidate_(CFG.SHEET_BUDGET); }
 
   return { 연도: year, 세부항목: name, 열삭제됨: !stillUsed, budget: budgetForYear_(year) };
 }
