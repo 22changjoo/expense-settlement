@@ -24,19 +24,45 @@ const API = (() => {
     return !!(c.url && c.token);
   }
 
-  async function call(action, payload = {}) {
+  /** 저장 요청마다 붙이는 고유 번호. 재시도해도 같은 값을 씁니다. */
+  function newRequestId() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    return 'r-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  /**
+   * @param opts.retries  네트워크 오류일 때 다시 시도할 횟수
+   *
+   * fetch 가 실패했다는 것은 응답을 못 받았다는 뜻일 뿐, 서버가 저장하지
+   * 않았다는 뜻이 아닙니다. payload.요청ID 가 있으면 서버가 같은 요청을
+   * 알아보고 두 번 저장하지 않으므로, 안심하고 다시 보낼 수 있습니다.
+   */
+  async function call(action, payload = {}, opts = {}) {
     const { url, token } = getConfig();
     if (!url) throw new Error('웹앱 URL 이 설정되지 않았습니다.');
 
-    let res;
-    try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ token, action, payload }),
-        redirect: 'follow'
-      });
-    } catch (e) {
+    const retries = payload.요청ID ? (opts.retries ?? 2) : 0;
+    const requestBody = JSON.stringify({ token, action, payload });
+
+    let res, lastError;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: requestBody,
+          redirect: 'follow'
+        });
+        lastError = null;
+        break;
+      } catch (e) {
+        lastError = e;
+        if (attempt < retries) await sleep(1200 * (attempt + 1));
+      }
+    }
+    if (lastError) {
       throw new Error('서버에 연결하지 못했습니다. 네트워크와 웹앱 URL 을 확인하세요.');
     }
 
@@ -51,5 +77,5 @@ const API = (() => {
     return body.data;
   }
 
-  return { call, getConfig, setConfig, isConfigured };
+  return { call, getConfig, setConfig, isConfigured, newRequestId };
 })();

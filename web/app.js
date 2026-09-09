@@ -837,7 +837,7 @@ async function handleReceiptFile(file) {
   if (!file) return;
   try {
     const img = await UI.readImage(file);
-    State.upload = { ...img, analyzing: true, form: null };
+    State.upload = { ...img, analyzing: true, form: null, requestId: API.newRequestId() };
     renderUpload();
 
     let analysis = null, subscriptionMatch = null, analysisError = '';
@@ -943,7 +943,7 @@ async function saveUpload() {
   if (!canSaveUpload(f)) return;
   UI.loading(true, '저장 중…');
   try {
-    await API.call('createExpense', {
+    const res = await API.call('createExpense', {
       항목: f.항목,
       목회비세부항목: f.목회비세부항목,
       사용일자: f.사용일자,
@@ -952,10 +952,13 @@ async function saveUpload() {
       비고: f.비고,
       연결구독ID: f.연결구독ID,
       imageBase64: u.base64,
-      mimeType: u.mimeType
+      mimeType: u.mimeType,
+      요청ID: u.requestId
     });
     resetUpload();
-    UI.toast('등록했습니다. 영수증 제출상태는 “미제출”입니다.');
+    UI.toast(res && res.중복요청
+      ? '이미 저장된 영수증입니다. 중복으로 저장하지 않았습니다.'
+      : '등록했습니다. 영수증 제출상태는 “미제출”입니다.');
     await reload();
     go('dashboard');
   } catch (e) {
@@ -1189,10 +1192,13 @@ async function submitSettlement(open) {
       입금확인방식: s.method,
       imageBase64: s.method === '캡처이미지' ? s.capture?.base64 : '',
       mimeType: s.capture?.mimeType || '',
-      연결된지출ID목록: ids
+      연결된지출ID목록: ids,
+      요청ID: (s.requestId = s.requestId || API.newRequestId())
     });
-    State.settle = { ...s, selected: {}, capture: null, deposit: '', depositDate: '' };
-    UI.toast(res.차액 === 0 ? '정산 완료 — 금액이 일치합니다.' : `차액 ${UI.won(Math.abs(res.차액))} 발생`, res.차액 === 0 ? '' : 'danger');
+    State.settle = { ...s, selected: {}, capture: null, deposit: '', depositDate: '', requestId: null };
+    UI.toast(res.중복요청 ? '이미 저장된 정산입니다.'
+      : res.차액 === 0 ? '정산 완료 — 금액이 일치합니다.' : `차액 ${UI.won(Math.abs(res.차액))} 발생`,
+      res.중복요청 || res.차액 === 0 ? '' : 'danger');
     await reload();
     go('settle');
   } catch (e) {
@@ -1650,7 +1656,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.09-2';
+const APP_VERSION = '2026.09.09-3';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

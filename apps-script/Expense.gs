@@ -15,6 +15,10 @@ function validateExpense_(p) {
 }
 
 function createExpense_(p) {
+  // 같은 요청이 다시 들어왔으면 새로 쓰지 않고 먼저 저장된 것을 돌려줍니다.
+  var already = findByRequestId_(CFG.SHEET_EXPENSE, p.요청ID);
+  if (already) return Object.assign(normalizeExpense_(already), { 중복요청: true });
+
   var errors = validateExpense_(p);
   if (errors.length) throw new Error(errors.join('\n'));
 
@@ -36,10 +40,12 @@ function createExpense_(p) {
     '영수증제출상태': submitted,
     '제출일': submitted === '제출완료' ? (ymd_(p.제출일) || today_()) : '',
     '정산기록ID': '',
-    '정산상태': '미정산',
+    '정산상태': SETTLE_STATUSES.indexOf(p.정산상태) >= 0 ? p.정산상태 : '미정산',
     '연결구독ID': String(p.연결구독ID || ''),
-    '비고': String(p.비고 || '')
+    '비고': String(p.비고 || ''),
+    '요청ID': String(p.요청ID || '')
   };
+  if (row['요청ID']) ensureColumn_(CFG.SHEET_EXPENSE, '요청ID');
   appendRow_(CFG.SHEET_EXPENSE, row);
   return row;
 }
@@ -109,4 +115,68 @@ function toggleSubmitted_(p) {
     '제출일': next === '제출완료' ? today_() : ''
   });
   return { 지출ID: p.지출ID, 영수증제출상태: next };
+}
+
+var SETTLE_STATUSES = ['미정산', '정산완료', '금액불일치', '정산확인불가(과거기록)'];
+
+/**
+ * 과거 기록 일괄 등록.
+ *
+ * 교회 장부에 이미 정리된 내역처럼, 영수증 이미지 없이 여러 건을 한 번에
+ * 넣을 때 씁니다. 건별로 부르면 왕복마다 몇 초가 걸려 한 번에 씁니다.
+ */
+function importExpenses_(p) {
+  var items = p.items || [];
+  if (!items.length) throw new Error('등록할 내역이 없습니다.');
+  if (items.length > 300) throw new Error('한 번에 300건까지만 등록할 수 있습니다.');
+
+  var sh = sheet_(CFG.SHEET_EXPENSE);
+  var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+    .map(function (h) { return String(h).trim(); });
+
+  // 일련번호는 시트 전체를 통틀어 이어집니다.
+  var seq = 0;
+  readSheet_(CFG.SHEET_EXPENSE).rows.forEach(function (r) {
+    var m = String(r['지출ID']).match(/EXP-\d{8}-(\d+)$/);
+    if (m) seq = Math.max(seq, parseInt(m[1], 10));
+  });
+
+  var stamp = nowIso_();
+  var created = [];
+  var rows = items.map(function (it) {
+    var errors = validateExpense_(it);
+    if (errors.length) throw new Error(ymd_(it.사용일자) + ' 항목: ' + errors.join(' / '));
+
+    var useDate = ymd_(it.사용일자);
+    var id = 'EXP-' + useDate.replace(/-/g, '') + '-' + pad3_(++seq);
+    var submitted = it.영수증제출상태 === '제출완료' ? '제출완료' : '미제출';
+    var obj = {
+      '지출ID': id,
+      '등록일시': stamp,
+      '사용일자': useDate,
+      '항목': it.항목,
+      '목회비세부항목': it.항목 === '목회비' ? it.목회비세부항목 : '',
+      '인원_내용': it.항목 === '주유비' ? '' : String(it.인원_내용 || '').trim(),
+      '금액': num_(it.금액),
+      '영수증이미지URL': String(it.영수증이미지URL || ''),
+      '영수증제출상태': submitted,
+      '제출일': submitted === '제출완료' ? (ymd_(it.제출일) || '') : '',
+      '정산기록ID': '',
+      '정산상태': SETTLE_STATUSES.indexOf(it.정산상태) >= 0 ? it.정산상태 : '미정산',
+      '연결구독ID': String(it.연결구독ID || ''),
+      '비고': String(it.비고 || '')
+    };
+    created.push({ 지출ID: id, 사용일자: useDate, 금액: obj['금액'] });
+    return header.map(function (h) { return obj[h] === undefined ? '' : obj[h]; });
+  });
+
+  sh.getRange(sh.getLastRow() + 1, 1, rows.length, header.length).setValues(rows);
+  invalidate_(CFG.SHEET_EXPENSE);
+
+  return {
+    건수: created.length,
+    합계: created.reduce(function (a, c) { return a + c.금액; }, 0),
+    처음: created[0],
+    마지막: created[created.length - 1]
+  };
 }

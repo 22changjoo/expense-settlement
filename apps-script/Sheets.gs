@@ -151,3 +151,30 @@ function nextSubscriptionId_() {
   });
   return 'SUB-' + pad3_(max + 1);
 }
+
+/* ---------- 중복 저장 방지 ---------- */
+
+/**
+ * 요청ID.
+ *
+ * 응답이 오는 도중에 연결이 끊기면 앱은 실패로 보지만 서버는 이미 저장을
+ * 마친 뒤일 수 있습니다. 그 상태에서 다시 보내면 같은 내용이 두 번 들어갑니다.
+ * 앱이 저장 한 건마다 고유한 번호를 붙여 보내고, 서버는 그 번호가 이미
+ * 있으면 새로 쓰지 않고 먼저 저장된 것을 돌려줍니다.
+ */
+function ensureColumn_(name, col) {
+  var sh = sheet_(name);
+  var last = sh.getLastColumn();
+  var header = sh.getRange(1, 1, 1, last).getValues()[0]
+    .map(function (h) { return String(h).trim(); });
+  if (header.indexOf(col) >= 0) return;
+  sh.getRange(1, last + 1).setValue(col);
+  invalidate_(name);
+}
+
+/** 이미 처리한 요청이면 그 행을 돌려줍니다. */
+function findByRequestId_(name, requestId) {
+  if (!requestId) return null;
+  ensureColumn_(name, '요청ID');
+  return findRow_(name, '요청ID', requestId);
+}

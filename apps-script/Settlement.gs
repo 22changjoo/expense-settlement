@@ -29,6 +29,20 @@ function settlementCandidates_(type, period) {
 }
 
 function createSettlement_(p) {
+  var already = findByRequestId_(CFG.SHEET_SETTLEMENT, p.요청ID);
+  if (already) {
+    return {
+      정산ID: String(already['정산ID']), 정산유형: String(already['정산유형']),
+      대상기간: String(already['대상기간']), 입금액: num_(already['입금액']),
+      연결지출합계: num_(already['연결지출합계']), 차액: num_(already['차액']),
+      일치여부: num_(already['차액']) === 0 ? '일치' : '불일치',
+      입금일: ymd_(already['입금일']),
+      입금캡처이미지URL: String(already['입금캡처이미지URL'] || ''),
+      연결된지출ID목록: String(already['연결된지출ID목록'] || '').split(',').filter(String),
+      중복요청: true
+    };
+  }
+
   var type = p.정산유형;
   if (['목회비정산', '경비정산'].indexOf(type) < 0) throw new Error('정산유형이 올바르지 않습니다.');
   var period = String(p.대상기간 || '');
@@ -56,6 +70,8 @@ function createSettlement_(p) {
   var match = diff === 0 ? '일치' : '불일치';
   var settlementId = nextSettlementId_(depositDate);
 
+  if (p.요청ID) ensureColumn_(CFG.SHEET_SETTLEMENT, '요청ID');
+
   var captureUrl = '';
   var method = p.입금확인방식 === '캡처이미지' ? '캡처이미지' : '수기입력';
   if (method === '캡처이미지' && p.imageBase64) {
@@ -73,7 +89,8 @@ function createSettlement_(p) {
     '연결된지출ID목록': ids.join(','),
     '연결지출합계': sum,
     '일치여부': match === '일치' ? '일치' : '불일치(' + formatWon_(diff) + ')',
-    '차액': diff
+    '차액': diff,
+    '요청ID': String(p.요청ID || '')
   });
 
   var status = diff === 0 ? '정산완료' : '금액불일치';

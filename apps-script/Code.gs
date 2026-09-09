@@ -41,6 +41,7 @@ function route_(action, p) {
     case 'listExpenses':      return { expenses: allExpenses_() };
     case 'analyzeReceipt':    return analyzeReceipt_(p.imageBase64, p.mimeType);
     case 'createExpense':     return createExpense_(p);
+    case 'importExpenses':    return importExpenses_(p);
     case 'updateExpense':     return updateExpense_(p);
     case 'deleteExpense':     return deleteExpense_(p);
     case 'toggleSubmitted':   return toggleSubmitted_(p);
