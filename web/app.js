@@ -1592,7 +1592,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.08-7';
+const APP_VERSION = '2026.09.09-1';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -1608,4 +1608,5 @@ if ('serviceWorker' in navigator) {
 }
 
 UI.refreshIcons(document.body);
+UI.initSheetDrag();
 boot();

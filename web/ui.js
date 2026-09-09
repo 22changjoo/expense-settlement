@@ -74,17 +74,115 @@ const UI = (() => {
   }
 
   /* ---------- 바텀시트 ---------- */
+  function sheetEl() { return document.getElementById('sheet'); }
+  function sheetPanel() { return sheetEl().querySelector('.sheet-panel'); }
+
   function openSheet(html) {
-    const sheet = document.getElementById('sheet');
+    const sheet = sheetEl();
     const body = document.getElementById('sheet-body');
+    const panel = sheetPanel();
     body.innerHTML = html;
+    panel.style.transform = '';
+    panel.classList.remove('is-dragging');
+    panel.scrollTop = 0;
     sheet.hidden = false;
     refreshIcons(body);
     return body;
   }
-  function closeSheet() {
-    document.getElementById('sheet').hidden = true;
+
+  function hideSheet_() {
+    const panel = sheetPanel();
+    sheetEl().hidden = true;
+    panel.style.transform = '';
+    panel.classList.remove('is-dragging');
     document.getElementById('sheet-body').innerHTML = '';
+  }
+
+  /** animate=true 면 아래로 미끄러지며 닫습니다(끌어 내려 닫을 때). */
+  function closeSheet(animate) {
+    if (!animate) { hideSheet_(); return; }
+    const panel = sheetPanel();
+    panel.classList.remove('is-dragging');
+    panel.style.transform = 'translateY(100%)';
+    setTimeout(hideSheet_, 200);
+  }
+
+  /**
+   * 바텀시트를 아래로 끌어 닫습니다.
+   *
+   * 시트 안이 스크롤되는 중에는 끌기가 시작되지 않도록, 맨 위(scrollTop 0)에서
+   * 아래로 움직일 때만 손잡이 역할을 넘겨받습니다. 손잡이에서는 스크롤 위치와
+   * 무관하게 바로 끌 수 있습니다.
+   */
+  const CLOSE_DISTANCE = 110;   // 이만큼 내리면 닫습니다
+  const CLOSE_VELOCITY = 0.55;  // px/ms — 짧게 튕겨도 닫힙니다
+
+  function initSheetDrag() {
+    const panel = sheetPanel();
+    const grip = document.getElementById('sheet-grip');
+    if (!panel || !grip) return;
+
+    let startY = null, startedAt = 0, dy = 0, active = false, fromGrip = false;
+
+    const begin = (y, viaGrip) => {
+      startY = y; startedAt = Date.now(); dy = 0;
+      fromGrip = !!viaGrip;
+      active = !!viaGrip;                 // 손잡이는 바로 끌기 시작
+      if (active) panel.classList.add('is-dragging');
+    };
+
+    const move = (y, ev) => {
+      if (startY === null) return;
+      const delta = y - startY;
+
+      if (!active) {
+        // 맨 위에서 아래로 밀 때만 끌기로 전환합니다.
+        if (delta > 8 && panel.scrollTop <= 0) {
+          active = true;
+          panel.classList.add('is-dragging');
+        } else {
+          if (delta < -8 || panel.scrollTop > 0) startY = null;  // 스크롤에 양보
+          return;
+        }
+      }
+
+      dy = Math.max(0, delta);
+      panel.style.transform = 'translateY(' + dy + 'px)';
+      if (ev.cancelable) ev.preventDefault();
+    };
+
+    const end = () => {
+      if (startY === null) return;
+      const elapsed = Date.now() - startedAt;
+      // 짧게 튕겨 내리는 동작도 닫히게 하되, 실제 제스처라고 볼 만한
+      // 최소 거리(60px)와 시간(20ms)을 만족할 때만 속도를 인정합니다.
+      const fast = elapsed >= 20 && dy > 60 && dy / elapsed > CLOSE_VELOCITY;
+      const shouldClose = active && (dy > CLOSE_DISTANCE || fast);
+
+      startY = null; active = false; fromGrip = false;
+      panel.classList.remove('is-dragging');
+
+      if (shouldClose) closeSheet(true);
+      else panel.style.transform = '';     // 제자리로 돌아갑니다
+      dy = 0;
+    };
+
+    // --- 터치 ---
+    panel.addEventListener('touchstart', ev => {
+      if (ev.target.closest('input, textarea, select')) return;
+      begin(ev.touches[0].clientY, ev.target.closest('#sheet-grip'));
+    }, { passive: true });
+    panel.addEventListener('touchmove', ev => move(ev.touches[0].clientY, ev), { passive: false });
+    panel.addEventListener('touchend', end);
+    panel.addEventListener('touchcancel', end);
+
+    // --- 마우스: 손잡이를 끌어 내립니다 ---
+    grip.addEventListener('mousedown', ev => { begin(ev.clientY, true); ev.preventDefault(); });
+    window.addEventListener('mousemove', ev => move(ev.clientY, ev));
+    window.addEventListener('mouseup', end);
+
+    // 손잡이를 그냥 눌러도 닫히게 둡니다(끌지 않은 경우).
+    grip.addEventListener('click', () => { if (dy === 0) closeSheet(true); });
   }
 
   /** 확인 대화상자 (바텀시트) */
@@ -236,7 +334,7 @@ const UI = (() => {
 
   return {
     won, num, esc, dateLabel, pct, tone, icon, refreshIcons, statusBadges,
-    toast, loading, openSheet, closeSheet, confirmSheet, readImage, gauge, fileSize,
+    toast, loading, openSheet, closeSheet, confirmSheet, initSheetDrag, readImage, gauge, fileSize,
     donut, CATEGORY_ICON, SUB_ICON
   };
 })();
