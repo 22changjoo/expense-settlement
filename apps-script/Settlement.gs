@@ -24,8 +24,21 @@ function settlementCandidates_(type, period) {
     });
   }
 
-  return out.filter(function (e) { return e.정산상태 !== '정산확인불가(과거기록)'; })
-    .sort(function (a, b) { return a.사용일자 < b.사용일자 ? -1 : 1; });
+  // 정산 대기(제출완료 & 미정산)만 후보로 둡니다. 아직 내지 않은 영수증은 입금 대사
+  // 대상이 아니므로 섞지 않고, 대신 몇 건 있는지만 알려 줍니다.
+  var inPeriod = out.filter(function (e) { return e.정산상태 !== '정산확인불가(과거기록)'; });
+  return {
+    candidates: inPeriod.filter(isAwaitingSettlement_)
+      .sort(function (a, b) { return a.사용일자 < b.사용일자 ? -1 : 1; }),
+    미제출건수: inPeriod.filter(function (e) {
+      return e.영수증제출상태 !== '제출완료' && e.정산상태 === '미정산';
+    }).length
+  };
+}
+
+/** 정산 대기 = 제출은 했고 아직 정산되지 않은 것 (Dashboard.gs 와 같은 기준) */
+function isAwaitingSettlement_(e) {
+  return e.영수증제출상태 === '제출완료' && e.정산상태 === '미정산';
 }
 
 function createSettlement_(p) {
@@ -63,6 +76,9 @@ function createSettlement_(p) {
   ids.forEach(function (id) {
     if (!byId[id]) throw new Error('존재하지 않는 지출ID: ' + id);
     if (byId[id].정산기록ID) throw new Error(id + ' 은(는) 이미 ' + byId[id].정산기록ID + ' 에 연결되어 있습니다.');
+    if (byId[id].영수증제출상태 !== '제출완료') {
+      throw new Error(id + ' 은(는) 아직 제출하지 않은 영수증입니다. 먼저 제출완료로 바꾸세요.');
+    }
     sum += byId[id].금액;
   });
 

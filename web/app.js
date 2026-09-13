@@ -1270,8 +1270,11 @@ async function loadCandidates() {
   body.innerHTML = `<div class="empty">${UI.icon('loader')}불러오는 중…</div>`;
   UI.refreshIcons(body);
   try {
-    const { candidates } = await API.call('settlementCandidates', { 정산유형: s.tab, 대상기간: period });
+    const res = await API.call('settlementCandidates', { 정산유형: s.tab, 대상기간: period });
+    // 후보는 정산 대기(제출완료·미정산)만 옵니다. 미제출은 몇 건인지만 받아 안내합니다.
+    const candidates = res.candidates || [];
     s.candidates = candidates;
+    s.unsubmittedInPeriod = res.미제출건수 || 0;
     s.selected = {};
     candidates.forEach(c => { if (!c.정산기록ID) s.selected[c.지출ID] = true; }); // 기본 전체 선택
     renderSettleForm();
@@ -1287,8 +1290,12 @@ function renderSettleForm() {
   const done = s.candidates.filter(c => c.정산기록ID);
   const sum = open.filter(c => s.selected[c.지출ID]).reduce((a, c) => a + c.금액, 0);
 
+  const unsubmittedHint = s.unsubmittedInPeriod
+    ? `<p class="form-note settle-hint">${UI.icon('circle-alert')} 이 기간 미제출 영수증 ${s.unsubmittedInPeriod}건은 제출완료로 바꾸면 여기에 나타납니다.</p>`
+    : '';
+
   if (!s.candidates.length) {
-    body.innerHTML = `<div class="empty">${UI.icon('inbox')}이 기간에 정산할 지출이 없습니다.</div>`;
+    body.innerHTML = `${unsubmittedHint}<div class="empty">${UI.icon('inbox')}이 기간에 정산 대기인 지출이 없습니다.</div>`;
     UI.refreshIcons(body);
     return;
   }
@@ -1303,7 +1310,7 @@ function renderSettleForm() {
       <div class="cr-amt">${UI.won(c.금액)}</div>
     </label>`;
 
-  body.innerHTML = `
+  body.innerHTML = `${unsubmittedHint}
     <div class="list">${open.map(row).join('') || `<div class="empty">${UI.icon('circle-check')}이 기간의 지출은 모두 정산되었습니다.</div>`}</div>
 
     ${done.length ? `
@@ -1875,7 +1882,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.13-2';
+const APP_VERSION = '2026.09.13-3';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

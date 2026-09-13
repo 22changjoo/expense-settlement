@@ -540,3 +540,6 @@ input[type=month]::-webkit-date-and-time-value {
 
 .sel-submit { flex-direction: column; gap: 1px; line-height: 1.25; }
 .sel-submit .sel-sub { font-size: 12px; font-weight: 500; opacity: .85; font-variant-numeric: tabular-nums; }
+
+.settle-hint { display: flex; align-items: center; gap: 6px; margin: 0 2px 10px; color: var(--warn); }
+.settle-hint svg { flex: none; }

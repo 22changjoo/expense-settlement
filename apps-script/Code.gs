@@ -82,7 +82,7 @@ function route_(action, p) {
     case 'bulkSetSubmitted':  return bulkSetSubmitted_(p);
     case 'receiptImage':      return fetchImageBase64_(p.url);
 
-    case 'settlementCandidates': return { candidates: settlementCandidates_(p.정산유형, p.대상기간) };
+    case 'settlementCandidates': return settlementCandidates_(p.정산유형, p.대상기간);
     case 'weeksOfMonth':      return { weeks: weeksOfMonth_(p.month) };
     case 'listSettlements':   return { settlements: allSettlements_() };
     case 'createSettlement':  return createSettlement_(p);
