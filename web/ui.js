@@ -41,18 +41,18 @@ const UI = (() => {
   }
 
   /** 지출 상태 배지들 */
+  /**
+   * 지출 한 건이 지금 어느 단계인지 배지 하나로 보여 줍니다.
+   *   미제출 → 정산 대기(냈고 입금 전) → 정산완료 / 금액불일치
+   * 예전에는 '제출완료' 와 '미정산' 배지를 나란히 달았는데, 글자가 비슷한
+   * 미제출·미정산 때문에 이미 낸 영수증도 미제출로 읽히기 쉬웠습니다.
+   */
   function statusBadges(e) {
-    const out = [];
-    out.push(e.영수증제출상태 === '제출완료'
-      ? `<span class="badge ok">${icon('circle-check')}제출완료</span>`
-      : `<span class="badge warn">${icon('circle-alert')}미제출</span>`);
-
-    if (e.정산상태 === '정산완료') out.push(`<span class="badge ok">${icon('circle-check')}정산완료</span>`);
-    else if (e.정산상태 === '금액불일치') out.push(`<span class="badge danger">${icon('triangle-alert')}금액불일치</span>`);
-    else if (e.정산상태 === '정산확인불가(과거기록)') out.push(`<span class="badge">${icon('archive')}과거기록</span>`);
-    else out.push(`<span class="badge">${icon('clock')}미정산</span>`);
-
-    return out.join('');
+    if (e.정산상태 === '정산완료') return `<span class="badge ok">${icon('circle-check')}정산완료</span>`;
+    if (e.정산상태 === '금액불일치') return `<span class="badge danger">${icon('triangle-alert')}금액불일치</span>`;
+    if (e.정산상태 === '정산확인불가(과거기록)') return `<span class="badge">${icon('archive')}과거기록</span>`;
+    if (e.영수증제출상태 !== '제출완료') return `<span class="badge warn">${icon('circle-alert')}미제출</span>`;
+    return `<span class="badge accent">${icon('clock')}정산 대기</span>`;
   }
 
   /* ---------- 토스트 ---------- */

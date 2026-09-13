@@ -259,7 +259,9 @@ function renderDashboard() {
   const alerts = [];
   if (b.금액불일치) alerts.push(alertRow('triangle-alert', '금액 불일치', b.금액불일치, 'danger', '금액불일치'));
   if (b.미제출) alerts.push(alertRow('circle-alert', '미제출 영수증', b.미제출, 'warn', '미제출'));
-  if (b.미정산) alerts.push(alertRow('clock', '정산 대기', b.미정산, '', '미정산'));
+  // 정산 대기는 제출했지만 아직 입금되지 않은 것만 셉니다(미제출과 겹치지 않음).
+  const awaitingCount = b.정산대기 ?? (State.boot.expenses || []).filter(isAwaitingSettlement).length;
+  if (awaitingCount) alerts.push(alertRow('clock', '정산 대기', awaitingCount, '', '정산 대기'));
 
   const isRatio = State.pastoralView === 'ratio';
 
@@ -482,6 +484,11 @@ function patchExpensesLocal(ids, fn) {
   saveSnapshot(b);
 }
 
+/** 정산 대기 = 제출은 했고 아직 정산되지 않은 것. 서버 Dashboard.gs 와 같은 기준입니다. */
+function isAwaitingSettlement(e) {
+  return e.영수증제출상태 === '제출완료' && e.정산상태 === '미정산';
+}
+
 /** 서버와 같은 기준으로 상태 배지 수를 다시 셉니다. */
 function recomputeBadges() {
   const b = State.boot;
@@ -489,9 +496,15 @@ function recomputeBadges() {
   const ex = b.expenses || [];
   b.dashboard.배지 = {
     미제출: ex.filter(e => e.영수증제출상태 === '미제출').length,
+    정산대기: ex.filter(isAwaitingSettlement).length,
     미정산: ex.filter(e => e.정산상태 === '미정산').length,
     금액불일치: ex.filter(e => e.정산상태 === '금액불일치').length
   };
+  if (b.dashboard.경비) {
+    const etc = ex.filter(e => e.항목 === '경비' && isAwaitingSettlement(e));
+    b.dashboard.경비.정산대기건수 = etc.length;
+    b.dashboard.경비.정산대기금액 = etc.reduce((a, e) => a + e.금액, 0);
+  }
 }
 
 /** 서버의 validateExpense_ 와 같은 규칙. 화면에서 먼저 걸러 되돌릴 일을 줄입니다. */
@@ -557,7 +570,8 @@ function filteredExpenses() {
     }
 
     if (f.상태 !== '전체') {
-      if (['미제출', '제출완료'].includes(f.상태)) { if (e.영수증제출상태 !== f.상태) return false; }
+      if (f.상태 === '미제출') { if (e.영수증제출상태 !== '미제출') return false; }
+      else if (f.상태 === '정산 대기') { if (!isAwaitingSettlement(e)) return false; }
       else if (e.정산상태 !== f.상태) return false;
     }
     return true;
@@ -574,7 +588,11 @@ function renderList() {
   if (State.listSelect.on) { renderSelectList(root, rows); return; }
 
   const total = rows.reduce((a, e) => a + e.금액, 0);
-  const unsubmitted = (State.boot.expenses || []).filter(e => e.영수증제출상태 === '미제출').length;
+  // 일괄 제출은 '미제출' 을 보고 있을 때만 둡니다. 정산 대기 등 다른 목록에서는
+  // 제출과 무관하므로 보이지 않게 합니다.
+  const unsubmitted = f.상태 === '미제출'
+    ? (State.boot.expenses || []).filter(e => e.영수증제출상태 === '미제출').length
+    : 0;
 
   const chips = (name, values, current) => `
     <div class="chip-group">
@@ -602,7 +620,7 @@ function renderList() {
              <label class="field"><span>종료</span><input type="date" data-filter-date="to" value="${f.to}"></label>
            </div>` : ''}
       <div class="field" style="margin-bottom:0"><span>상태</span>
-        ${chips('상태', ['전체', '미제출', '제출완료', '미정산', '정산완료', '금액불일치'], f.상태)}
+        ${chips('상태', ['전체', '미제출', '정산 대기', '정산완료', '금액불일치'], f.상태)}
       </div>
     </div>
 
@@ -1857,7 +1875,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.13-1';
+const APP_VERSION = '2026.09.13-2';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

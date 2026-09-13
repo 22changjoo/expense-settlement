@@ -5,8 +5,16 @@
  * POST 본문을 text/plain 으로 보냅니다. 본문은 {token, action, payload} JSON 입니다.
  */
 
+/** 요청 내용이 도착하지 않았음을 알립니다. 앱은 이 코드를 보고 다시 보냅니다. */
+function emptyRequest_() {
+  return json_({ ok: false, code: 'EMPTY_REQUEST', error: '요청 내용이 서버에 전달되지 않았습니다.' });
+}
+
 function doGet(e) {
-  var action = (e && e.parameter && e.parameter.action) || 'ping';
+  var action = e && e.parameter && e.parameter.action;
+  // 앱은 모든 요청을 POST 로 보냅니다. 인자 없는 GET 은 구글이 POST 를 되돌려 보내면서
+  // 본문이 사라진 경우이므로, 예전처럼 ping(ok:true) 으로 답해 성공처럼 보이게 하지 않습니다.
+  if (!action) return emptyRequest_();
   if (action === 'ping') return json_({ ok: true, service: '경비정산시스템', time: nowIso_() });
   return handle_(action, e.parameter || {}, (e.parameter || {}).token);
 }
@@ -18,6 +26,7 @@ function doPost(e) {
   } catch (err) {
     return json_({ ok: false, error: '요청 본문을 해석할 수 없습니다.' });
   }
+  if (!body.action) return emptyRequest_();
   return handle_(body.action, body.payload || {}, body.token);
 }
 

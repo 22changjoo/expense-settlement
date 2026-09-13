@@ -219,14 +219,19 @@ function buildDashboard_(year) {
 
   var projection = subscriptionProjection_(year, yearly, subs);
 
+  // 정산 대기 = 제출은 했고 아직 정산되지 않은 것.
+  // 제출하지 않은 영수증은 '미제출' 로만 셉니다. 두 목록이 겹치면 같은 영수증이
+  // 두 곳에서 할 일로 보이기 때문입니다.
+  var awaiting = function (e) { return e.영수증제출상태 === '제출완료' && e.정산상태 === '미정산'; };
   var pendingSettlement = expenses.filter(function (e) {
-    return (e.항목 === '주유비' || e.항목 === '경비') && e.정산상태 === '미정산';
+    return (e.항목 === '주유비' || e.항목 === '경비') && awaiting(e);
   });
-  var etcPending = expenses.filter(function (e) { return e.항목 === '경비' && e.정산상태 === '미정산'; });
+  var etcPending = expenses.filter(function (e) { return e.항목 === '경비' && awaiting(e); });
 
   var badges = {
     미제출: expenses.filter(function (e) { return e.영수증제출상태 === '미제출'; }).length,
-    미정산: expenses.filter(function (e) { return e.정산상태 === '미정산'; }).length,
+    정산대기: expenses.filter(awaiting).length,
+    미정산: expenses.filter(function (e) { return e.정산상태 === '미정산'; }).length,  // 이전 버전 앱 호환
     금액불일치: expenses.filter(function (e) { return e.정산상태 === '금액불일치'; }).length
   };
 
