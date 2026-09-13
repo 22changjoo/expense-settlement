@@ -8,6 +8,7 @@ const State = {
   pastoralView: 'amount',  // 'amount' = 총액(게이지), 'ratio' = 구성비(원그래프)
   showAllSub: false,
   showProjection: false,   // 정기구독 예상 내역 펼침 여부
+  listSelect: { on: false, ids: {}, date: '', prevFilters: null },   // 영수증 일괄 제출 선택
   budgetYear: null,        // 설정 화면에서 보고 있는 예산 연도
   listFilters: { 항목: '전체', 세부: '전체', 기간: '올해', 상태: '전체', from: '', to: '' },
   upload: null,        // { dataUrl, base64, mimeType, form, analysis }
@@ -83,6 +84,8 @@ async function reload(opts = {}) {
   else UI.loading(true, '불러오는 중…');
   try {
     const data = await API.call('bootstrap', { year: State.year });
+    // 뒤에서 저장 중인 변경이 있으면, 그 저장이 끝난 뒤 다시 받아 옵니다.
+    if (silent && pendingWrites > 0) return;
     State.boot = data;
     State.year = data.meta.year;
     saveSnapshot(data);
@@ -97,7 +100,7 @@ async function reload(opts = {}) {
       if (/토큰|URL|연결하지/.test(e.message)) showOnboarding(e.message);
     }
   } finally {
-    setStale(false);
+    setStale(pendingWrites > 0);
     if (!silent) UI.loading(false);
   }
 }
@@ -446,6 +449,62 @@ function alertRow(iconName, label, count, variant, filter) {
   </button>`;
 }
 
+/* ---------------- 화면 먼저 반영, 저장은 뒤에서 ---------------- */
+
+/*
+ * 저장 버튼을 누르면 서버 저장(~3초)과 전체 다시 불러오기(~3초)가 끝날 때까지
+ * 화면이 막혀 있었습니다. 이제 이 기기의 데이터를 먼저 고쳐 바로 보여 주고,
+ * 서버 저장과 합계 재계산은 뒤에서 합니다. 실패하면 알리고 서버 값으로 되돌립니다.
+ */
+let pendingWrites = 0;
+
+async function backgroundWrite(task, failMessage) {
+  pendingWrites++;
+  setStale(true);
+  try {
+    await task();
+  } catch (e) {
+    UI.toast(`${failMessage} ${e.message}`, 'danger');
+  } finally {
+    pendingWrites--;
+    if (pendingWrites === 0) reload({ silent: true });
+  }
+}
+
+/** 이 기기에 들고 있는 지출 데이터를 고칩니다(목록·최근 등록 모두). */
+function patchExpensesLocal(ids, fn) {
+  const b = State.boot;
+  if (!b) return;
+  const set = new Set(ids);
+  (b.expenses || []).forEach(e => { if (set.has(e.지출ID)) fn(e); });
+  (b.dashboard?.최근등록 || []).forEach(e => { if (set.has(e.지출ID)) fn(e); });
+  recomputeBadges();
+  saveSnapshot(b);
+}
+
+/** 서버와 같은 기준으로 상태 배지 수를 다시 셉니다. */
+function recomputeBadges() {
+  const b = State.boot;
+  if (!b?.dashboard) return;
+  const ex = b.expenses || [];
+  b.dashboard.배지 = {
+    미제출: ex.filter(e => e.영수증제출상태 === '미제출').length,
+    미정산: ex.filter(e => e.정산상태 === '미정산').length,
+    금액불일치: ex.filter(e => e.정산상태 === '금액불일치').length
+  };
+}
+
+/** 서버의 validateExpense_ 와 같은 규칙. 화면에서 먼저 걸러 되돌릴 일을 줄입니다. */
+function validateExpenseLocal(p) {
+  const meta = State.boot.meta;
+  if (!meta.categories.includes(p.항목)) return '항목을 선택하세요.';
+  if (!p.사용일자) return '사용일자를 입력하세요.';
+  if (!(Number(p.금액) > 0)) return '금액을 입력하세요.';
+  if (p.항목 === '목회비' && !meta.subcategories.includes(p.목회비세부항목)) return '목회비 세부항목을 선택하세요.';
+  if ((p.항목 === '목회비' || p.항목 === '경비') && !String(p.인원_내용 || '').trim()) return '인원/내용을 입력하세요.';
+  return '';
+}
+
 /* ---------------- 지출 카드 ---------------- */
 
 function expenseCard(e) {
@@ -512,7 +571,10 @@ function renderList() {
   if (!meta) { root.innerHTML = ''; return; }
 
   const rows = filteredExpenses();
+  if (State.listSelect.on) { renderSelectList(root, rows); return; }
+
   const total = rows.reduce((a, e) => a + e.금액, 0);
+  const unsubmitted = (State.boot.expenses || []).filter(e => e.영수증제출상태 === '미제출').length;
 
   const chips = (name, values, current) => `
     <div class="chip-group">
@@ -520,6 +582,12 @@ function renderList() {
     </div>`;
 
   root.innerHTML = `
+    ${unsubmitted ? `
+      <button class="btn btn-block bulk-entry" id="sel-start">
+        ${UI.icon('list-checks')}<span>영수증 일괄 제출</span>
+        <span class="badge warn">미제출 ${unsubmitted}건</span>
+      </button>` : ''}
+
     <div class="card">
       <div class="field"><span>항목</span>${chips('항목', ['전체', ...meta.categories], f.항목)}</div>
       ${f.항목 === '목회비'
@@ -560,7 +628,125 @@ function renderList() {
   root.querySelectorAll('[data-filter-date]').forEach(inp => {
     inp.onchange = () => { State.listFilters[inp.dataset.filterDate] = inp.value; renderList(); };
   });
+  const startBtn = root.querySelector('#sel-start');
+  if (startBtn) startBtn.onclick = enterSelect;
   bindExpenseCards(root);
+}
+
+/* ---------------- 영수증 일괄 제출 ---------------- */
+
+/** 선택 모드로 들어갑니다. 제출할 것만 보이도록 미제출 전체로 목록을 바꿉니다. */
+function enterSelect() {
+  State.listSelect = { on: true, ids: {}, date: todayStr(), prevFilters: { ...State.listFilters } };
+  State.listFilters = { ...State.listFilters, 항목: '전체', 세부: '전체', 기간: '전체', 상태: '미제출' };
+  window.scrollTo({ top: 0 });
+  renderList();
+}
+
+/** 선택 모드를 끝내고 들어오기 전의 필터로 돌려놓습니다. */
+function exitSelect() {
+  const prev = State.listSelect.prevFilters;
+  State.listSelect = { on: false, ids: {}, date: '', prevFilters: null };
+  if (prev) State.listFilters = prev;
+}
+
+function selectRow(e, checked) {
+  const desc = e.인원_내용 || (e.항목 === '주유비' ? '주유' : '(내용 없음)');
+  return `
+    <label class="check-row ${checked ? 'is-checked' : ''}">
+      <input type="checkbox" data-pick-exp="${UI.esc(e.지출ID)}" ${checked ? 'checked' : ''}>
+      <div class="cr-body">
+        <div class="cr-top">${UI.dateLabel(e.사용일자)} · ${UI.esc(e.항목)}${e.목회비세부항목 ? ' · ' + UI.esc(e.목회비세부항목) : ''}</div>
+        <div class="cr-desc">${UI.esc(desc)}</div>
+      </div>
+      <div class="cr-amt">${UI.won(e.금액)}</div>
+    </label>`;
+}
+
+function renderSelectList(root, rows) {
+  const sel = State.listSelect;
+  const summary = () => {
+    const picked = rows.filter(e => sel.ids[e.지출ID]);
+    return { count: picked.length, sum: picked.reduce((a, e) => a + e.금액, 0) };
+  };
+  // 건수는 크게, 합계는 작은 둘째 줄로 둡니다(한 줄에 넣으면 좁은 화면에서 꺾입니다).
+  const label = ({ count, sum }) => count
+    ? `<span class="sel-main">${count}건 제출완료</span><span class="sel-sub">${UI.won(sum)}</span>`
+    : `<span class="sel-main">제출할 영수증을 고르세요</span>`;
+  const allOn = () => rows.length > 0 && rows.every(e => sel.ids[e.지출ID]);
+  const first = summary();
+
+  root.innerHTML = `
+    <div class="card">
+      <div class="card-head" style="margin-bottom:6px">
+        <div class="card-title">${UI.icon('list-checks')} 영수증 일괄 제출</div>
+        ${rows.length ? `<button class="link-btn" id="sel-all">${allOn() ? '전체 해제' : '전체 선택'}</button>` : ''}
+      </div>
+      <p class="form-note" style="margin:0">회계간사님께 낸 영수증을 고르십시오. 미제출 ${rows.length}건이 있습니다.</p>
+    </div>
+
+    <div class="list">
+      ${rows.length ? rows.map(e => selectRow(e, !!sel.ids[e.지출ID])).join('')
+        : `<div class="empty">${UI.icon('circle-check')}미제출 영수증이 없습니다.</div>`}
+    </div>
+
+    <div class="sticky-actions select-bar">
+      <label class="sel-date"><span>제출일</span>
+        <input type="date" id="sel-date" value="${UI.esc(sel.date)}"></label>
+      <div class="row">
+        <button class="btn" id="sel-cancel">취소</button>
+        <button class="btn btn-primary sel-submit" id="sel-submit" ${first.count ? '' : 'disabled'}>${label(first)}</button>
+      </div>
+    </div>`;
+
+  UI.refreshIcons(root);
+
+  // 체크할 때마다 목록 전체를 다시 그리지 않고 필요한 곳만 고칩니다(스크롤 위치 유지).
+  const refresh = () => {
+    const now = summary();
+    root.querySelector('#sel-submit').innerHTML = label(now);
+    root.querySelector('#sel-submit').disabled = !now.count;
+    const all = root.querySelector('#sel-all');
+    if (all) all.textContent = allOn() ? '전체 해제' : '전체 선택';
+  };
+
+  root.querySelectorAll('[data-pick-exp]').forEach(cb => {
+    cb.onchange = () => {
+      sel.ids[cb.dataset.pickExp] = cb.checked;
+      cb.closest('.check-row').classList.toggle('is-checked', cb.checked);
+      refresh();
+    };
+  });
+  const all = root.querySelector('#sel-all');
+  if (all) all.onclick = () => {
+    const turnOn = !allOn();
+    rows.forEach(e => { sel.ids[e.지출ID] = turnOn; });
+    root.querySelectorAll('[data-pick-exp]').forEach(cb => {
+      cb.checked = turnOn;
+      cb.closest('.check-row').classList.toggle('is-checked', turnOn);
+    });
+    refresh();
+  };
+  root.querySelector('#sel-date').onchange = ev => { sel.date = ev.target.value; };
+  root.querySelector('#sel-cancel').onclick = () => { exitSelect(); renderList(); };
+  root.querySelector('#sel-submit').onclick = bulkSubmit;
+}
+
+function bulkSubmit() {
+  const sel = State.listSelect;
+  const ids = Object.keys(sel.ids).filter(id => sel.ids[id]);
+  if (!ids.length) return;
+  const date = sel.date || todayStr();
+
+  patchExpensesLocal(ids, e => { e.영수증제출상태 = '제출완료'; e.제출일 = date; });
+  exitSelect();
+  renderList();
+  UI.toast(`${ids.length}건을 제출완료로 바꿨습니다.`);
+
+  backgroundWrite(
+    () => API.call('bulkSetSubmitted', { 지출ID목록: ids, 상태: '제출완료', 제출일: date }, { retries: 2 }),
+    '제출 상태를 서버에 저장하지 못했습니다.'
+  );
 }
 
 /* ---------------- 지출 상세 (바텀시트) ---------------- */
@@ -649,15 +835,30 @@ async function openExpenseDetail(id) {
       연결구독ID: body.querySelector('#d-cat').value === '목회비'
         ? body.querySelector('#d-sublink').value : ''
     };
-    UI.loading(true, '저장 중…');
-    try {
-      await API.call('updateExpense', payload);
-      UI.closeSheet();
-      UI.toast('수정했습니다.');
-      await reload();
-    } catch (ex) {
-      err.hidden = false; err.textContent = ex.message;
-    } finally { UI.loading(false); }
+    const problem = validateExpenseLocal(payload);
+    if (problem) { err.hidden = false; err.textContent = problem; return; }
+
+    // 화면에는 바로 반영하고, 서버 저장은 뒤에서 합니다.
+    patchExpensesLocal([e.지출ID], x => {
+      x.항목 = payload.항목;
+      x.목회비세부항목 = payload.항목 === '목회비' ? payload.목회비세부항목 : '';
+      x.사용일자 = payload.사용일자;
+      x.금액 = Number(payload.금액);
+      x.인원_내용 = payload.항목 === '주유비' ? '' : String(payload.인원_내용 || '').trim();
+      x.비고 = payload.비고;
+      if (x.영수증제출상태 !== payload.영수증제출상태) {
+        x.제출일 = payload.영수증제출상태 === '제출완료' ? todayStr() : '';
+      }
+      x.영수증제출상태 = payload.영수증제출상태;
+      x.연결구독ID = payload.연결구독ID || '';
+    });
+    UI.closeSheet(true);
+    render();
+    UI.toast('수정했습니다.');
+    backgroundWrite(
+      () => API.call('updateExpense', payload, { retries: 2 }),
+      '수정 내용을 서버에 저장하지 못했습니다.'
+    );
   };
 
   body.querySelector('#d-delete').onclick = async () => {
@@ -1656,7 +1857,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.09-3';
+const APP_VERSION = '2026.09.13-1';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

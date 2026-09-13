@@ -21,13 +21,38 @@ function doPost(e) {
   return handle_(body.action, body.payload || {}, body.token);
 }
 
+/**
+ * 시트를 고치는 요청.
+ * 앱은 저장을 뒤에서 처리하므로 여러 저장이 거의 동시에 들어올 수 있습니다.
+ * 한 요청이 읽고 쓰는 사이에 다른 요청이 끼어들면 먼저 쓴 값이 사라지므로,
+ * 이런 요청은 잠금을 잡고 하나씩 처리합니다.
+ */
+var WRITE_ACTIONS = {
+  createExpense: 1, importExpenses: 1, updateExpense: 1, deleteExpense: 1,
+  toggleSubmitted: 1, bulkSetSubmitted: 1,
+  createSettlement: 1, deleteSettlement: 1,
+  saveSubscription: 1, deleteSubscription: 1,
+  updateBudget: 1, addBudgetYear: 1, deleteBudgetYear: 1, addSubLimit: 1, deleteSubLimit: 1
+};
+
 function handle_(action, payload, token) {
   try {
     var expected = prop_('API_TOKEN');
     if (expected && String(token) !== expected) {
       return json_({ ok: false, error: '접근 토큰이 올바르지 않습니다. 설정 화면에서 토큰을 확인하세요.', code: 'AUTH' });
     }
-    return json_({ ok: true, data: route_(action, payload) });
+    var lock = null;
+    if (WRITE_ACTIONS[action]) {
+      lock = LockService.getScriptLock();
+      if (!lock.tryLock(25000)) {
+        throw new Error('다른 저장이 진행 중입니다. 잠시 후 다시 시도하세요.');
+      }
+    }
+    try {
+      return json_({ ok: true, data: route_(action, payload) });
+    } finally {
+      if (lock) lock.releaseLock();
+    }
   } catch (err) {
     return json_({ ok: false, error: String(err && err.message ? err.message : err) });
   }
@@ -45,6 +70,7 @@ function route_(action, p) {
     case 'updateExpense':     return updateExpense_(p);
     case 'deleteExpense':     return deleteExpense_(p);
     case 'toggleSubmitted':   return toggleSubmitted_(p);
+    case 'bulkSetSubmitted':  return bulkSetSubmitted_(p);
     case 'receiptImage':      return fetchImageBase64_(p.url);
 
     case 'settlementCandidates': return { candidates: settlementCandidates_(p.정산유형, p.대상기간) };

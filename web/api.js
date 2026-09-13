@@ -43,7 +43,8 @@ const API = (() => {
     const { url, token } = getConfig();
     if (!url) throw new Error('웹앱 URL 이 설정되지 않았습니다.');
 
-    const retries = payload.요청ID ? (opts.retries ?? 2) : 0;
+    // 요청ID 가 있거나, 호출하는 쪽이 여러 번 보내도 안전하다고 알려 준 요청만 다시 보냅니다.
+    const retries = opts.retries ?? (payload.요청ID ? 2 : 0);
     const requestBody = JSON.stringify({ token, action, payload });
 
     let res, lastError;

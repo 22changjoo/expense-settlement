@@ -180,3 +180,65 @@ function importExpenses_(p) {
     마지막: created[created.length - 1]
   };
 }
+
+/**
+ * 영수증 제출상태 일괄 변경.
+ *
+ * 지출ID 열만 읽어 행 번호를 찾고, 고른 칸에만 씁니다. RangeList 는 같은 값을
+ * 여러 칸에 한 번에 쓰므로 몇 건을 바꾸든 쓰기는 두 번입니다.
+ * (열 전체를 읽었다 다시 쓰면, 그 사이에 들어온 다른 변경을 덮어씁니다.)
+ * 같은 요청을 다시 보내도 결과가 같아 재시도해도 안전합니다.
+ */
+function bulkSetSubmitted_(p) {
+  var ids = (p.지출ID목록 || []).map(String).filter(String);
+  if (!ids.length) throw new Error('바꿀 지출을 한 건 이상 고르세요.');
+  var status = p.상태 === '미제출' ? '미제출' : '제출완료';
+  var date = status === '제출완료' ? (ymd_(p.제출일) || today_()) : '';
+
+  var sh = sheet_(CFG.SHEET_EXPENSE);
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) throw new Error('지출기록이 비어 있습니다.');
+  var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+    .map(function (h) { return String(h).trim(); });
+  var idCol = colIndex_(header, '지출ID');
+  var stLetter = colLetter_(colIndex_(header, '영수증제출상태'));
+  var dtLetter = colLetter_(colIndex_(header, '제출일'));
+
+  var idVals = sh.getRange(2, idCol, lastRow - 1, 1).getValues();
+  var want = {};
+  ids.forEach(function (id) { want[id] = true; });
+
+  var stCells = [], dtCells = [], done = [];
+  for (var i = 0; i < idVals.length; i++) {
+    var id = String(idVals[i][0]);
+    if (!want[id]) continue;
+    var row = i + 2;
+    stCells.push(stLetter + row);
+    dtCells.push(dtLetter + row);
+    done.push(id);
+  }
+
+  if (done.length) {
+    sh.getRangeList(stCells).setValue(status);
+    sh.getRangeList(dtCells).setValue(date);
+    invalidate_(CFG.SHEET_EXPENSE);
+  }
+
+  return {
+    상태: status,
+    제출일: date,
+    변경건수: done.length,
+    찾지못한ID: ids.filter(function (id) { return done.indexOf(id) < 0; })
+  };
+}
+
+/** 열 번호 → A1 표기 열 문자 (1 → A, 27 → AA) */
+function colLetter_(n) {
+  var out = '';
+  while (n > 0) {
+    var m = (n - 1) % 26;
+    out = String.fromCharCode(65 + m) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
+}

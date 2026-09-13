@@ -52,15 +52,29 @@ function appendRow_(name, obj) {
 }
 
 /** 특정 행의 일부 열만 갱신합니다. */
+/**
+ * 특정 행의 일부 열만 갱신합니다.
+ * 필드마다 setValue 를 부르면 그 수만큼 Sheets 왕복이 생겨(지출 수정 한 번에 9번)
+ * 느렸습니다. 행을 한 번 읽어 고친 뒤 한 번에 씁니다.
+ */
 function updateRow_(name, rowNumber, patch) {
   var sh = sheet_(name);
-  var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
-    .map(function (h) { return String(h).trim(); });
+  var lastCol = sh.getLastColumn();
+  var memo = MEMO_.values[name];
+  var header = (memo && memo.header.length === lastCol)
+    ? memo.header
+    : sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) { return String(h).trim(); });
+
+  var range = sh.getRange(rowNumber, 1, 1, lastCol);
+  var values = range.getValues()[0];
+  var changed = false;
   Object.keys(patch).forEach(function (key) {
     var idx = header.indexOf(key);
     if (idx < 0) return;
-    sh.getRange(rowNumber, idx + 1).setValue(patch[key]);
+    values[idx] = patch[key];
+    changed = true;
   });
+  if (changed) range.setValues([values]);
   invalidate_(name);
 }
 

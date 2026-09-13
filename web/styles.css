@@ -522,3 +522,21 @@ input[type=month]::-webkit-date-and-time-value {
   background: var(--bg); color: var(--text);
   font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
 }
+
+/* ---------- 영수증 일괄 제출 ---------- */
+
+.bulk-entry { justify-content: flex-start; gap: 10px; padding: 13px 16px; font-weight: 600; }
+.bulk-entry svg { color: var(--accent); font-size: 18px; }
+.bulk-entry > span:first-of-type { flex: 1; text-align: left; }
+
+.check-row.is-checked {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: var(--accent-soft);
+}
+
+.select-bar { display: flex; flex-direction: column; gap: 10px; }
+.sel-date { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 580; color: var(--text-2); }
+.sel-date input { flex: 1; padding: 9px 12px; font-size: 14px; }
+
+.sel-submit { flex-direction: column; gap: 1px; line-height: 1.25; }
+.sel-submit .sel-sub { font-size: 12px; font-weight: 500; opacity: .85; font-variant-numeric: tabular-nums; }
