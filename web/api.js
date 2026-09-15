@@ -41,7 +41,8 @@ const API = (() => {
    */
   /** 조회만 하는 요청 — 몇 번을 다시 보내도 데이터가 바뀌지 않습니다. */
   const READ_ACTIONS = new Set([
-    'ping', 'bootstrap', 'dashboard', 'listExpenses', 'receiptImage',
+    // analyzeReceipt 는 Claude 로 읽기만 하고 시트를 바꾸지 않으므로 다시 보내도 안전합니다.
+    'ping', 'bootstrap', 'dashboard', 'listExpenses', 'receiptImage', 'analyzeReceipt',
     'settlementCandidates', 'weeksOfMonth', 'listSettlements', 'listSubscriptions',
     'getBudget', 'listBudgets', 'driveStatus', 'exportCsv'
   ]);
@@ -52,7 +53,7 @@ const API = (() => {
    * 있기도 합니다. 그만 기다리고 다시 보내는 편이 빠릅니다. 영수증 분석과 사진이
    * 실리는 저장은 원래 오래 걸리므로 넉넉히 둡니다.
    */
-  const TIMEOUT_MS = { analyzeReceipt: 90000, createExpense: 60000, createSettlement: 60000, importExpenses: 120000 };
+  const TIMEOUT_MS = { analyzeReceipt: 75000, createExpense: 60000, createSettlement: 60000, importExpenses: 120000 };
   const DEFAULT_TIMEOUT_MS = 30000;
 
   /** 다시 보내면 나아질 수 있는 실패(연결 끊김, 깨진 응답, 너무 늦은 응답, 구글이 요청을 되돌린 경우) */

@@ -82,6 +82,7 @@ function ext_(mimeType) {
   if (mimeType.indexOf('png') >= 0) return 'png';
   if (mimeType.indexOf('webp') >= 0) return 'webp';
   if (mimeType.indexOf('heic') >= 0) return 'heic';
+  if (mimeType.indexOf('pdf') >= 0) return 'pdf';
   return 'jpg';
 }
 

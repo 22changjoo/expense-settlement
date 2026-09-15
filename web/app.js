@@ -830,7 +830,10 @@ async function openExpenseDetail(id) {
     frame.innerHTML = `<p class="form-note">영수증 불러오는 중…</p>`;
     API.call('receiptImage', { url: e.영수증이미지URL })
       .then(img => {
-        frame.innerHTML = img
+        frame.innerHTML = img && img.mimeType === 'application/pdf'
+          ? `${pdfCard('PDF 영수증', img.data ? Math.floor(img.data.length * 3 / 4) : 0)}
+             <p class="form-note" style="margin-top:8px"><a href="${UI.esc(e.영수증이미지URL)}" target="_blank" rel="noopener">Drive 에서 PDF 열기</a></p>`
+          : img
           ? `<div class="receipt-frame"><img src="data:${img.mimeType};base64,${img.data}" alt="영수증"></div>
              <p class="form-note" style="margin-top:8px"><a href="${UI.esc(e.영수증이미지URL)}" target="_blank" rel="noopener">Drive 에서 열기</a></p>`
           : `<p class="form-note">영수증 이미지를 찾지 못했습니다.</p>`;
@@ -915,13 +918,13 @@ function renderUpload() {
     root.innerHTML = `
       <div class="card">
         <div class="card-head"><div class="card-title">${UI.icon('receipt-text')} 영수증 등록</div></div>
-        <p class="form-note" style="margin-top:0">사진을 올리면 날짜·금액·항목을 자동으로 읽어 초안을 채웁니다. 저장 전에 직접 확인하고 고치실 수 있습니다.</p>
+        <p class="form-note" style="margin-top:0">사진이나 PDF 를 올리면 날짜·금액·항목을 자동으로 읽어 초안을 채웁니다. 저장 전에 직접 확인하고 고치실 수 있습니다.</p>
         <div class="uploader">
           <button class="btn" id="btn-camera">${UI.icon('camera')} 카메라 촬영</button>
-          <button class="btn" id="btn-file">${UI.icon('image')} 파일 선택</button>
+          <button class="btn" id="btn-file">${UI.icon('file-image')} 파일 선택<span class="btn-hint">사진 · PDF</span></button>
         </div>
         <input type="file" accept="image/*" capture="environment" id="input-camera" hidden>
-        <input type="file" accept="image/*" id="input-file" hidden>
+        <input type="file" accept="image/*,application/pdf,.pdf" id="input-file" hidden>
       </div>`;
     UI.refreshIcons(root);
     root.querySelector('#btn-camera').onclick = () => root.querySelector('#input-camera').click();
@@ -932,11 +935,14 @@ function renderUpload() {
 
   if (u.analyzing) {
     root.innerHTML = `
-      <div class="receipt-frame"><img src="${u.dataUrl}" alt="영수증 미리보기"></div>
+      ${receiptPreview(u)}
       <div class="card" style="text-align:center">
         <div class="spinner" style="margin:6px auto 14px"></div>
-        <p class="muted" style="margin:0">영수증을 분석하고 있습니다…</p>
+        <p class="muted" style="margin:0 0 14px">영수증을 분석하고 있습니다…</p>
+        <button class="btn btn-sm" id="skip-analysis">건너뛰고 직접 입력</button>
       </div>`;
+    UI.refreshIcons(root);
+    root.querySelector('#skip-analysis').onclick = skipAnalysis;
     return;
   }
 
@@ -952,12 +958,15 @@ function renderUpload() {
   if (needsDesc && !String(f.인원_내용).trim()) missing.push('인원/내용');
 
   root.innerHTML = `
-    <div class="receipt-frame"><img src="${u.dataUrl}" alt="영수증"></div>
+    ${receiptPreview(u)}
 
     <div class="card">
       ${u.analysisError ? `<p class="form-error">${UI.esc(u.analysisError)}</p>` : ''}
+      ${u.analysisSkipped ? `<p class="form-note" style="margin-top:0">자동 분석을 건너뛰었습니다. 값을 직접 입력해 주세요.</p>` : ''}
       ${u.analysis?.vendor ? `<p class="form-note" style="margin-top:0">인식한 상호: <b>${UI.esc(u.analysis.vendor)}</b>${u.analysis.confidence ? ` · 신뢰도 ${UI.esc(u.analysis.confidence)}` : ''}</p>` : ''}
-      ${u.bytes ? `<p class="form-note" style="margin-top:0">저장 크기 ${UI.fileSize(u.bytes)}${u.originalBytes > u.bytes ? ` (원본 ${UI.fileSize(u.originalBytes)} 에서 줄임)` : ''} · ${u.width}×${u.height}</p>` : ''}
+      ${u.kind === 'pdf'
+        ? `<p class="form-note" style="margin-top:0">PDF · ${UI.fileSize(u.bytes)} · 원본 그대로 보관합니다</p>`
+        : u.bytes ? `<p class="form-note" style="margin-top:0">저장 크기 ${UI.fileSize(u.bytes)}${u.originalBytes > u.bytes ? ` (원본 ${UI.fileSize(u.originalBytes)} 에서 줄임)` : ''} · ${u.width}×${u.height}</p>` : ''}
 
       <div class="field"><span>항목</span>
         <div class="chip-group">
@@ -1052,49 +1061,87 @@ function healthGaugeHtml(f) {
     </div>`;
 }
 
+/** 분석 결과(없으면 빈 초안)로 입력 폼 기본값을 만듭니다. */
+function buildUploadForm(analysis, subscriptionMatch) {
+  const cat = analysis?.suggested_category || '경비';
+  return {
+    항목: subscriptionMatch ? '목회비' : cat,
+    // 정기구독을 찾았으면 세부항목은 구독 설정을 따릅니다(영수증 추론보다 정확합니다).
+    목회비세부항목: subscriptionMatch
+      ? subscriptionMatch.목회비세부항목
+      : (cat === '목회비' ? (analysis?.suggested_subcategory || '') : ''),
+    사용일자: analysis?.date || todayStr(),
+    금액: analysis?.amount || '',
+    인원_내용: subscriptionMatch ? subscriptionMatch.구독명 : '',
+    비고: '',
+    연결구독ID: subscriptionMatch ? subscriptionMatch.구독ID : '',
+    noteOpen: false
+  };
+}
+
 async function handleReceiptFile(file) {
   if (!file) return;
+  let picked;
   try {
-    const img = await UI.readImage(file);
-    State.upload = { ...img, analyzing: true, form: null, requestId: API.newRequestId() };
-    renderUpload();
-
-    let analysis = null, subscriptionMatch = null, analysisError = '';
-    try {
-      const res = await API.call('analyzeReceipt', { imageBase64: img.base64, mimeType: img.mimeType });
-      if (res.ok) { analysis = res.data; subscriptionMatch = res.subscriptionMatch; }
-      else analysisError = res.error + ' 값을 직접 입력해 주세요.';
-    } catch (e) {
-      analysisError = '자동 분석에 실패했습니다 (' + e.message + '). 값을 직접 입력해 주세요.';
-    }
-
-    const cat = analysis?.suggested_category || '경비';
-    State.upload = {
-      ...State.upload,
-      analyzing: false,
-      analysis,
-      analysisError,
-      subscriptionMatch,
-      form: {
-        항목: subscriptionMatch ? '목회비' : cat,
-        // 정기구독을 찾았으면 세부항목은 구독 설정을 따릅니다(영수증 추론보다 정확합니다).
-        목회비세부항목: subscriptionMatch
-          ? subscriptionMatch.목회비세부항목
-          : (cat === '목회비' ? (analysis?.suggested_subcategory || '') : ''),
-        사용일자: analysis?.date || todayStr(),
-        금액: analysis?.amount || '',
-        인원_내용: subscriptionMatch ? subscriptionMatch.구독명 : '',
-        비고: '',
-        연결구독ID: subscriptionMatch ? subscriptionMatch.구독ID : '',
-        noteOpen: false
-      }
-    };
-    renderUpload();
+    picked = await UI.readReceiptFile(file);
   } catch (e) {
     UI.toast(e.message, 'danger');
     resetUpload();
     renderUpload();
+    return;
   }
+
+  const requestId = API.newRequestId();
+  State.upload = { ...picked, analyzing: true, form: null, requestId };
+  renderUpload();
+
+  let analysis = null, subscriptionMatch = null, analysisError = '';
+  try {
+    // 일시적 통신 오류는 API.call 이 한 번 더 보내고, Claude 혼잡은 서버가 다시 시도합니다.
+    const res = await API.call('analyzeReceipt', { imageBase64: picked.base64, mimeType: picked.mimeType }, { retries: 1 });
+    if (res.ok) { analysis = res.data; subscriptionMatch = res.subscriptionMatch; }
+    else analysisError = res.error + ' 값을 직접 입력해 주세요.';
+  } catch (e) {
+    analysisError = '자동 분석에 실패했습니다 (' + e.message + '). 값을 직접 입력해 주세요.';
+  }
+
+  // 그사이 건너뛰었거나 다른 파일을 골랐으면 늦게 온 결과는 버립니다.
+  const u = State.upload;
+  if (!u || u.requestId !== requestId || !u.analyzing) return;
+
+  State.upload = {
+    ...u, analyzing: false, analysis, analysisError, subscriptionMatch,
+    form: buildUploadForm(analysis, subscriptionMatch)
+  };
+  if (State.view === 'upload') renderUpload();
+}
+
+/** 분석을 기다리지 않고 바로 직접 입력으로 넘어갑니다. */
+function skipAnalysis() {
+  const u = State.upload;
+  if (!u || !u.analyzing) return;
+  State.upload = {
+    ...u, analyzing: false, analysis: null, subscriptionMatch: null,
+    analysisError: '', analysisSkipped: true, form: buildUploadForm(null, null)
+  };
+  renderUpload();
+}
+
+/** 올린 파일 미리보기. 사진은 이미지로, PDF 는 파일 카드로 보여 줍니다. */
+function receiptPreview(u) {
+  if (u.kind === 'pdf') return pdfCard(u.fileName, u.bytes);
+  return `<div class="receipt-frame"><img src="${u.dataUrl}" alt="영수증"></div>`;
+}
+
+function pdfCard(name, bytes) {
+  return `
+    <div class="receipt-frame pdf-card">
+      <div class="pdf-icon">${UI.icon('file-text')}</div>
+      <div class="pdf-meta">
+        <div class="pdf-name">${UI.esc(name || 'PDF 영수증')}</div>
+        <div class="pdf-size">PDF${bytes ? ' · ' + UI.fileSize(bytes) : ''}</div>
+      </div>
+    </div>`;
 }
 
 function bindUploadForm(root) {
@@ -1882,7 +1929,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.13-3';
+const APP_VERSION = '2026.09.15-1';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

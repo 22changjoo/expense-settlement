@@ -268,6 +268,46 @@ const UI = (() => {
     });
   }
 
+  /* ---------- PDF ---------- */
+
+  const PDF_MAX_BYTES = 10 * 1024 * 1024;
+
+  function isPdf(file) {
+    return file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name || ''));
+  }
+
+  /** PDF 는 줄이지 않고 원본 그대로 보냅니다(글자가 선명하게 남도록). */
+  function readPdf(file) {
+    return new Promise((resolve, reject) => {
+      if (file.size > PDF_MAX_BYTES) {
+        reject(new Error(`PDF 가 너무 큽니다 (${fileSize(file.size)}). 10MB 이하로 올려 주세요.`));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('PDF 를 읽지 못했습니다.'));
+      reader.onload = () => {
+        const base64 = String(reader.result).split(',')[1] || '';
+        if (!base64.startsWith('JVBER')) {          // "%PDF" 로 시작하지 않으면 PDF 가 아닙니다
+          reject(new Error('PDF 파일이 아닌 것 같습니다. 다른 파일을 골라 주세요.'));
+          return;
+        }
+        resolve({
+          kind: 'pdf', dataUrl: '', base64, mimeType: 'application/pdf',
+          bytes: file.size, originalBytes: file.size, width: 0, height: 0,
+          fileName: file.name || '영수증.pdf'
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /** 사진이면 줄여서, PDF 면 그대로 읽습니다. */
+  async function readReceiptFile(file) {
+    if (isPdf(file)) return readPdf(file);
+    const img = await readImage(file);
+    return { kind: 'image', fileName: file.name || '', ...img };
+  }
+
   /** 1024 단위 사람이 읽는 크기 */
   function fileSize(bytes) {
     if (!bytes) return '';
@@ -334,7 +374,7 @@ const UI = (() => {
 
   return {
     won, num, esc, dateLabel, pct, tone, icon, refreshIcons, statusBadges,
-    toast, loading, openSheet, closeSheet, confirmSheet, initSheetDrag, readImage, gauge, fileSize,
+    toast, loading, openSheet, closeSheet, confirmSheet, initSheetDrag, readImage, readReceiptFile, isPdf, gauge, fileSize,
     donut, CATEGORY_ICON, SUB_ICON
   };
 })();
