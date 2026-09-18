@@ -38,7 +38,20 @@ var HEADERS = {
 };
 
 var CATEGORIES = ['목회비', '주유비', '경비'];
-var SUBCATEGORIES = ['건강관리', '도서구입', '심방', '세미나·강의수강', '자동차관리', '사역도구', '기타'];
+var SUBCATEGORIES = ['건강관리', '도서구입', '심방', '경조사비', '세미나·강의수강', '자동차관리', '사역도구', '기타'];
+
+/**
+ * 영수증 제출상태.
+ * 경조사비(조의금·축의금)처럼 영수증이 나오지 않는 지출은 낼 것이 없으므로
+ * '영수증없음' 으로 둡니다. 미제출 알림과 일괄 제출 목록에는 나오지 않지만,
+ * 정산 대기에는 제출완료와 똑같이 올라갑니다.
+ */
+var SUBMIT_STATES = ['미제출', '제출완료', '영수증없음'];
+
+function submitState_(v) {
+  return SUBMIT_STATES.indexOf(String(v)) >= 0 ? String(v) : '미제출';
+}
+
 
 function props_() {
   return PropertiesService.getScriptProperties();

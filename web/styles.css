@@ -573,3 +573,5 @@ input[type=month]::-webkit-date-and-time-value {
 .day-count { font-weight: 500; color: var(--text-3); font-size: 12px; }
 .day-sum { font-variant-numeric: tabular-nums; color: var(--text); }
 .day-group .list { gap: 8px; }
+
+.pdf-icon.no-receipt { background: var(--surface-2); color: var(--text-3); }

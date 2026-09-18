@@ -222,7 +222,7 @@ function buildDashboard_(year) {
   // 정산 대기 = 제출은 했고 아직 정산되지 않은 것.
   // 제출하지 않은 영수증은 '미제출' 로만 셉니다. 두 목록이 겹치면 같은 영수증이
   // 두 곳에서 할 일로 보이기 때문입니다.
-  var awaiting = function (e) { return e.영수증제출상태 === '제출완료' && e.정산상태 === '미정산'; };
+  var awaiting = isAwaitingSettlement_;   // 제출완료 또는 영수증없음 + 미정산
   var pendingSettlement = expenses.filter(function (e) {
     return (e.항목 === '주유비' || e.항목 === '경비') && awaiting(e);
   });

@@ -30,7 +30,7 @@ const UI = (() => {
 
   const CATEGORY_ICON = { '목회비': 'heart-handshake', '주유비': 'fuel', '경비': 'receipt' };
   const SUB_ICON = {
-    '건강관리': 'dumbbell', '도서구입': 'book-open', '심방': 'home',
+    '건강관리': 'dumbbell', '도서구입': 'book-open', '심방': 'home', '경조사비': 'gift',
     '세미나·강의수강': 'graduation-cap', '자동차관리': 'wrench',
     '사역도구': 'laptop', '기타': 'circle-ellipsis'
   };
@@ -51,8 +51,11 @@ const UI = (() => {
     if (e.정산상태 === '정산완료') return `<span class="badge ok">${icon('circle-check')}정산완료</span>`;
     if (e.정산상태 === '금액불일치') return `<span class="badge danger">${icon('triangle-alert')}금액불일치</span>`;
     if (e.정산상태 === '정산확인불가(과거기록)') return `<span class="badge">${icon('archive')}과거기록</span>`;
-    if (e.영수증제출상태 !== '제출완료') return `<span class="badge warn">${icon('circle-alert')}미제출</span>`;
-    return `<span class="badge accent">${icon('clock')}정산 대기</span>`;
+    if (e.영수증제출상태 === '미제출') return `<span class="badge warn">${icon('circle-alert')}미제출</span>`;
+    // 영수증이 없는 지출(경조사비 등)은 낼 것이 없으므로 바로 정산 대기입니다.
+    const noReceipt = e.영수증제출상태 === '영수증없음'
+      ? `<span class="badge">${icon('file-x')}영수증 없음</span>` : '';
+    return `<span class="badge accent">${icon('clock')}정산 대기</span>` + noReceipt;
   }
 
   /* ---------- 토스트 ---------- */

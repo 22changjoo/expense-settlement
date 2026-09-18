@@ -27,7 +27,7 @@ function createExpense_(p) {
   var url = String(p.영수증이미지URL || '');
   if (p.imageBase64) url = saveReceiptImage_(id, useDate, p.imageBase64, p.mimeType);
 
-  var submitted = p.영수증제출상태 === '제출완료' ? '제출완료' : '미제출';
+  var submitted = submitState_(p.영수증제출상태);
   var row = {
     '지출ID': id,
     '등록일시': nowIso_(),
@@ -38,7 +38,7 @@ function createExpense_(p) {
     '금액': num_(p.금액),
     '영수증이미지URL': url,
     '영수증제출상태': submitted,
-    '제출일': submitted === '제출완료' ? (ymd_(p.제출일) || today_()) : '',
+    '제출일': submitted === '제출완료' ? (ymd_(p.제출일) || today_()) : '',   // 영수증없음은 빈칸
     '정산기록ID': '',
     '정산상태': SETTLE_STATUSES.indexOf(p.정산상태) >= 0 ? p.정산상태 : '미정산',
     '연결구독ID': String(p.연결구독ID || ''),
@@ -70,7 +70,7 @@ function updateExpense_(p) {
     '목회비세부항목': merged.항목 === '목회비' ? merged.목회비세부항목 : '',
     '인원_내용': merged.항목 === '주유비' ? '' : String(merged.인원_내용 || '').trim(),
     '금액': num_(merged.금액),
-    '영수증제출상태': merged.영수증제출상태 === '제출완료' ? '제출완료' : '미제출',
+    '영수증제출상태': submitState_(merged.영수증제출상태),
     '연결구독ID': String(merged.연결구독ID || ''),
     '비고': String(merged.비고 || '')
   };
@@ -149,7 +149,7 @@ function importExpenses_(p) {
 
     var useDate = ymd_(it.사용일자);
     var id = 'EXP-' + useDate.replace(/-/g, '') + '-' + pad3_(++seq);
-    var submitted = it.영수증제출상태 === '제출완료' ? '제출완료' : '미제출';
+    var submitted = submitState_(it.영수증제출상태);
     var obj = {
       '지출ID': id,
       '등록일시': stamp,

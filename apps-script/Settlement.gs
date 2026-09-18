@@ -8,7 +8,8 @@
 
 /** 정산 대기 = 제출은 했고 아직 정산되지 않은 것 (Dashboard.gs 와 같은 기준) */
 function isAwaitingSettlement_(e) {
-  return e.영수증제출상태 === '제출완료' && e.정산상태 === '미정산';
+  // 영수증없음(경조사비 등)은 낼 것이 없으므로 제출완료와 같이 봅니다.
+  return e.영수증제출상태 !== '미제출' && e.정산상태 === '미정산';
 }
 
 function createSettlement_(p) {

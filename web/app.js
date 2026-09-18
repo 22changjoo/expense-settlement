@@ -486,7 +486,9 @@ function patchExpensesLocal(ids, fn) {
 
 /** 정산 대기 = 제출은 했고 아직 정산되지 않은 것. 서버 Dashboard.gs 와 같은 기준입니다. */
 function isAwaitingSettlement(e) {
-  return e.영수증제출상태 === '제출완료' && e.정산상태 === '미정산';
+  // 영수증이 없는 지출(경조사비 등)은 낼 것이 없으므로 제출완료와 같이 봅니다.
+  return (e.영수증제출상태 === '제출완료' || e.영수증제출상태 === '영수증없음')
+    && e.정산상태 === '미정산';
 }
 
 /** 서버와 같은 기준으로 상태 배지 수를 다시 셉니다. */
@@ -799,6 +801,7 @@ async function openExpenseDetail(id) {
       <select id="d-submitted">
         <option${e.영수증제출상태 === '미제출' ? ' selected' : ''}>미제출</option>
         <option${e.영수증제출상태 === '제출완료' ? ' selected' : ''}>제출완료</option>
+        <option value="영수증없음"${e.영수증제출상태 === '영수증없음' ? ' selected' : ''}>영수증없음</option>
       </select>
       ${e.제출일 ? `<span class="hint">제출일 ${UI.dateLabel(e.제출일)}</span>` : ''}
     </label>
@@ -823,6 +826,12 @@ async function openExpenseDetail(id) {
   };
   syncVisibility();
   UI.refreshIcons(body);
+
+  if (!e.영수증이미지URL) {
+    body.querySelector('#detail-image').innerHTML =
+      `<p class="form-note" style="margin:0 0 6px">${e.영수증제출상태 === '영수증없음'
+        ? '영수증 없이 등록한 지출입니다.' : '영수증 파일이 없습니다.'}</p>`;
+  }
 
   // 영수증 이미지는 Drive 비공개 파일이라 서버를 거쳐 가져옵니다.
   if (e.영수증이미지URL) {
@@ -923,12 +932,15 @@ function renderUpload() {
           <button class="btn" id="btn-camera">${UI.icon('camera')} 카메라 촬영</button>
           <button class="btn" id="btn-file">${UI.icon('file-image')} 파일 선택<span class="btn-hint">사진 · PDF</span></button>
         </div>
+        <button class="btn btn-block" id="btn-noreceipt" style="margin-top:10px">
+          ${UI.icon('file-x')} 영수증 없이 입력<span class="btn-hint">경조사비 등</span></button>
         <input type="file" accept="image/*" capture="environment" id="input-camera" hidden>
         <input type="file" accept="image/*,application/pdf,.pdf" id="input-file" hidden>
       </div>`;
     UI.refreshIcons(root);
     root.querySelector('#btn-camera').onclick = () => root.querySelector('#input-camera').click();
     root.querySelector('#btn-file').onclick = () => root.querySelector('#input-file').click();
+    root.querySelector('#btn-noreceipt').onclick = startWithoutReceipt;
     root.querySelectorAll('input[type=file]').forEach(inp => { inp.onchange = () => handleReceiptFile(inp.files[0]); });
     return;
   }
@@ -1116,6 +1128,16 @@ async function handleReceiptFile(file) {
   if (State.view === 'upload') renderUpload();
 }
 
+/** 영수증이 없는 지출(경조사비 등)을 곧바로 입력합니다. */
+function startWithoutReceipt() {
+  State.upload = {
+    kind: 'none', base64: '', mimeType: '', dataUrl: '', bytes: 0, originalBytes: 0,
+    analyzing: false, analysis: null, subscriptionMatch: null, analysisError: '',
+    requestId: API.newRequestId(), form: { ...buildUploadForm(null, null), 항목: '목회비' }
+  };
+  renderUpload();
+}
+
 /** 분석을 기다리지 않고 바로 직접 입력으로 넘어갑니다. */
 function skipAnalysis() {
   const u = State.upload;
@@ -1129,6 +1151,14 @@ function skipAnalysis() {
 
 /** 올린 파일 미리보기. 사진은 이미지로, PDF 는 파일 카드로 보여 줍니다. */
 function receiptPreview(u) {
+  if (u.kind === 'none') return `
+    <div class="receipt-frame pdf-card">
+      <div class="pdf-icon no-receipt">${UI.icon('file-x')}</div>
+      <div class="pdf-meta">
+        <div class="pdf-name">영수증 없음</div>
+        <div class="pdf-size">직접 입력한 지출입니다</div>
+      </div>
+    </div>`;
   if (u.kind === 'pdf') return pdfCard(u.fileName, u.bytes);
   return `<div class="receipt-frame"><img src="${u.dataUrl}" alt="영수증"></div>`;
 }
@@ -1217,13 +1247,16 @@ async function saveUpload() {
       인원_내용: f.인원_내용,
       비고: f.비고,
       연결구독ID: f.연결구독ID,
-      imageBase64: u.base64,
-      mimeType: u.mimeType,
+      imageBase64: u.base64 || '',
+      mimeType: u.mimeType || '',
+      영수증제출상태: u.kind === 'none' ? '영수증없음' : '미제출',
       요청ID: u.requestId
     });
     resetUpload();
     UI.toast(res && res.중복요청
       ? '이미 저장된 영수증입니다. 중복으로 저장하지 않았습니다.'
+      : u.kind === 'none'
+      ? '등록했습니다. 영수증이 없는 지출이라 바로 정산 대기로 올라갑니다.'
       : '등록했습니다. 영수증 제출상태는 “미제출”입니다.');
     await reload();
     go('dashboard');
@@ -1255,7 +1288,7 @@ function inSettlementTab(e, tab) {
 /** 아직 내지 않아 정산 목록에 나오지 못하는 건수 */
 function unsubmittedForSettlement(tab) {
   return (State.boot?.expenses || [])
-    .filter(e => inSettlementTab(e, tab) && e.영수증제출상태 !== '제출완료' && e.정산상태 === '미정산')
+    .filter(e => inSettlementTab(e, tab) && e.영수증제출상태 === '미제출' && e.정산상태 === '미정산')
     .length;
 }
 
@@ -1935,7 +1968,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.18-1';
+const APP_VERSION = '2026.09.18-2';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
