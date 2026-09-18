@@ -132,7 +132,7 @@ function allSettlements_() {
     return {
       정산ID: String(r['정산ID'] || ''),
       정산유형: String(r['정산유형'] || ''),
-      대상기간: String(r['대상기간'] || ''),
+      대상기간: periodLabel_(r['대상기간']),
       입금액: num_(r['입금액']),
       입금확인방식: String(r['입금확인방식'] || ''),
       입금캡처이미지URL: String(r['입금캡처이미지URL'] || ''),
@@ -272,4 +272,16 @@ function buildDashboard_(year) {
     배지: badges,
     최근등록: recent
   };
+}
+
+/**
+ * 대상기간 표시값.
+ * 예전에는 목회비 정산에 '2026-09' 를 넣었는데 시트가 날짜로 해석해
+ * "Tue Sep 01 2026 ..." 로 남은 기록이 있습니다. 그런 값은 월로 되돌려 보여 줍니다.
+ */
+function periodLabel_(v) {
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, CFG.TZ, 'yyyy-MM');
+  }
+  return String(v || '');
 }

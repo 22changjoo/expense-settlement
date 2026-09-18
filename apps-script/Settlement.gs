@@ -6,36 +6,6 @@
  *   그 외    → 불일치 / 선택 지출 모두 "금액불일치"
  */
 
-/** 정산 대상 후보 — 과거기록(정산확인불가)은 제외합니다. */
-function settlementCandidates_(type, period) {
-  var expenses = allExpenses_();
-  var out;
-
-  if (type === '목회비정산') {
-    out = expenses.filter(function (e) {
-      return e.항목 === '목회비' && e.사용일자.slice(0, 7) === period;
-    });
-  } else {
-    var r = weekRange_(period);
-    if (!r) throw new Error('대상기간(주차) 형식이 올바르지 않습니다: ' + period);
-    out = expenses.filter(function (e) {
-      return (e.항목 === '주유비' || e.항목 === '경비') &&
-        e.사용일자 >= r.start && e.사용일자 <= r.end;
-    });
-  }
-
-  // 정산 대기(제출완료 & 미정산)만 후보로 둡니다. 아직 내지 않은 영수증은 입금 대사
-  // 대상이 아니므로 섞지 않고, 대신 몇 건 있는지만 알려 줍니다.
-  var inPeriod = out.filter(function (e) { return e.정산상태 !== '정산확인불가(과거기록)'; });
-  return {
-    candidates: inPeriod.filter(isAwaitingSettlement_)
-      .sort(function (a, b) { return a.사용일자 < b.사용일자 ? -1 : 1; }),
-    미제출건수: inPeriod.filter(function (e) {
-      return e.영수증제출상태 !== '제출완료' && e.정산상태 === '미정산';
-    }).length
-  };
-}
-
 /** 정산 대기 = 제출은 했고 아직 정산되지 않은 것 (Dashboard.gs 와 같은 기준) */
 function isAwaitingSettlement_(e) {
   return e.영수증제출상태 === '제출완료' && e.정산상태 === '미정산';
@@ -59,7 +29,6 @@ function createSettlement_(p) {
   var type = p.정산유형;
   if (['목회비정산', '경비정산'].indexOf(type) < 0) throw new Error('정산유형이 올바르지 않습니다.');
   var period = String(p.대상기간 || '');
-  if (!period) throw new Error('대상기간을 선택하세요.');
 
   var ids = (p.연결된지출ID목록 || []).map(String).filter(String);
   if (!ids.length) throw new Error('정산에 포함할 지출을 한 건 이상 선택하세요.');
@@ -76,11 +45,17 @@ function createSettlement_(p) {
   ids.forEach(function (id) {
     if (!byId[id]) throw new Error('존재하지 않는 지출ID: ' + id);
     if (byId[id].정산기록ID) throw new Error(id + ' 은(는) 이미 ' + byId[id].정산기록ID + ' 에 연결되어 있습니다.');
-    if (byId[id].영수증제출상태 !== '제출완료') {
-      throw new Error(id + ' 은(는) 아직 제출하지 않은 영수증입니다. 먼저 제출완료로 바꾸세요.');
+    if (!isAwaitingSettlement_(byId[id])) {
+      throw new Error(id + ' 은(는) 정산 대기 상태가 아닙니다(미제출이거나 이미 정산됨).');
     }
     sum += byId[id].금액;
   });
+
+  // 대상기간을 주지 않으면 고른 지출의 사용일자 범위로 적습니다(주차 단위가 아니므로).
+  if (!period) {
+    var dates = ids.map(function (id) { return byId[id].사용일자; }).sort();
+    period = dates[0] === dates[dates.length - 1] ? dates[0] : dates[0] + '~' + dates[dates.length - 1];
+  }
 
   var diff = deposit - sum;
   var match = diff === 0 ? '일치' : '불일치';
@@ -94,7 +69,7 @@ function createSettlement_(p) {
     captureUrl = saveDepositImage_(settlementId, depositDate, p.imageBase64, p.mimeType);
   }
 
-  appendRow_(CFG.SHEET_SETTLEMENT, {
+  var row = appendRow_(CFG.SHEET_SETTLEMENT, {
     '정산ID': settlementId,
     '정산유형': type,
     '대상기간': period,
@@ -108,6 +83,9 @@ function createSettlement_(p) {
     '차액': diff,
     '요청ID': String(p.요청ID || '')
   });
+
+  // '2026-09-18' 같은 값을 시트가 날짜로 바꿔 버리므로, 그 칸만 글자 형식으로 다시 적습니다.
+  writeAsText_(CFG.SHEET_SETTLEMENT, row, '대상기간', period);
 
   var status = diff === 0 ? '정산완료' : '금액불일치';
   ids.forEach(function (id) {
@@ -167,4 +145,15 @@ function detachFromSettlement_(settlementId, expenseId) {
 function formatWon_(n) {
   var sign = n < 0 ? '-' : '+';
   return sign + Math.abs(n).toLocaleString('ko-KR') + '원';
+}
+
+/** 한 칸을 글자 그대로 적습니다(시트가 날짜·숫자로 해석하지 않도록). */
+function writeAsText_(name, rowNumber, colName, value) {
+  var sh = sheet_(name);
+  var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+    .map(function (h) { return String(h).trim(); });
+  var idx = header.indexOf(colName);
+  if (idx < 0) return;
+  sh.getRange(rowNumber, idx + 1).setNumberFormat('@').setValue(String(value));
+  invalidate_(name);
 }

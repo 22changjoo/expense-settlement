@@ -58,7 +58,9 @@ function handle_(action, payload, token) {
       }
     }
     try {
-      return json_({ ok: true, data: route_(action, payload) });
+      var result = route_(action, payload);
+      if (WRITE_ACTIONS[action]) bumpDataVersion_();   // 캐시된 bootstrap 을 버립니다
+      return json_({ ok: true, data: result });
     } finally {
       if (lock) lock.releaseLock();
     }
@@ -82,8 +84,6 @@ function route_(action, p) {
     case 'bulkSetSubmitted':  return bulkSetSubmitted_(p);
     case 'receiptImage':      return fetchImageBase64_(p.url);
 
-    case 'settlementCandidates': return settlementCandidates_(p.정산유형, p.대상기간);
-    case 'weeksOfMonth':      return { weeks: weeksOfMonth_(p.month) };
     case 'listSettlements':   return { settlements: allSettlements_() };
     case 'createSettlement':  return createSettlement_(p);
     case 'deleteSettlement':  return deleteSettlement_(p);
@@ -107,8 +107,66 @@ function route_(action, p) {
 }
 
 /** 앱 시작 시 필요한 데이터를 한 번에 내려줍니다. */
+/*
+ * bootstrap 응답 캐시.
+ *
+ * 앱은 열 때마다, 그리고 저장할 때마다 bootstrap 을 부르는데 5~8초가 걸립니다
+ * (시트 4개를 읽고 대시보드를 계산). 내용이 바뀌지 않았다면 다시 계산할 이유가
+ * 없으므로, 계산 결과를 캐시에 두고 쓰기가 일어날 때만 버립니다.
+ * 시트를 손으로 고치는 경우를 위해 3분이 지나면 저절로 비워집니다.
+ */
+var BOOTSTRAP_TTL_ = 180;
+var CACHE_CHUNK_ = 20000;   // 한글은 글자당 3바이트라 넉넉히 나눕니다(칸당 100KB 제한)
+
+function dataVersion_() {
+  return prop_('DATA_VERSION', '0');
+}
+
+function bumpDataVersion_() {
+  props_().setProperty('DATA_VERSION', String(Number(dataVersion_()) + 1));
+}
+
+function cacheGet_(key) {
+  var c = CacheService.getScriptCache();
+  var count = Number(c.get(key));
+  if (!count) return null;
+  var keys = [];
+  for (var i = 0; i < count; i++) keys.push(key + ':' + i);
+  var parts = c.getAll(keys);
+  var out = '';
+  for (var j = 0; j < count; j++) {
+    var part = parts[key + ':' + j];
+    if (part === undefined || part === null) return null;   // 일부만 남았으면 버립니다
+    out += part;
+  }
+  return out;
+}
+
+function cachePut_(key, value, seconds) {
+  var count = Math.ceil(value.length / CACHE_CHUNK_);
+  if (count > 20) return;
+  var map = {};
+  for (var i = 0; i < count; i++) map[key + ':' + i] = value.substr(i * CACHE_CHUNK_, CACHE_CHUNK_);
+  var c = CacheService.getScriptCache();
+  c.putAll(map, seconds);
+  c.put(key, String(count), seconds);
+}
+
 function bootstrap_(p) {
   var year = Number(p.year) || Number(Utilities.formatDate(new Date(), CFG.TZ, 'yyyy'));
+  var key = 'boot:' + year + ':' + dataVersion_();
+  if (!p.force) {
+    var hit = cacheGet_(key);
+    if (hit) {
+      try { return JSON.parse(hit); } catch (e) { /* 깨진 캐시는 무시하고 다시 계산합니다 */ }
+    }
+  }
+  var data = buildBootstrap_(year);
+  cachePut_(key, JSON.stringify(data), BOOTSTRAP_TTL_);
+  return data;
+}
+
+function buildBootstrap_(year) {
   return {
     dashboard: buildDashboard_(year),
     expenses: allExpenses_(),

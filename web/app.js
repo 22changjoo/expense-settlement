@@ -12,7 +12,7 @@ const State = {
   budgetYear: null,        // 설정 화면에서 보고 있는 예산 연도
   listFilters: { 항목: '전체', 세부: '전체', 기간: '올해', 상태: '전체', from: '', to: '' },
   upload: null,        // { dataUrl, base64, mimeType, form, analysis }
-  settle: { tab: '목회비정산', month: '', week: '', candidates: [], selected: {}, method: '수기입력', capture: null }
+  settle: { tab: '목회비정산', selected: {}, method: '수기입력', capture: null, deposit: '', depositDate: '', requestId: null }
 };
 
 const VIEW_TITLE = {
@@ -1239,12 +1239,72 @@ function currentMonthStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-async function renderSettle() {
-  const s = State.settle;
-  if (!s.month) s.month = currentMonthStr();
+/** 이 탭에서 정산할 수 있는 지출(정산 대기)을 최근 날짜부터. 서버를 부르지 않습니다. */
+function pendingForSettlement(tab) {
+  return (State.boot?.expenses || [])
+    .filter(e => inSettlementTab(e, tab) && isAwaitingSettlement(e))
+    .sort((a, b) => (a.사용일자 === b.사용일자
+      ? (a.지출ID < b.지출ID ? 1 : -1)
+      : (a.사용일자 < b.사용일자 ? 1 : -1)));
+}
 
+function inSettlementTab(e, tab) {
+  return tab === '목회비정산' ? e.항목 === '목회비' : (e.항목 === '주유비' || e.항목 === '경비');
+}
+
+/** 아직 내지 않아 정산 목록에 나오지 못하는 건수 */
+function unsubmittedForSettlement(tab) {
+  return (State.boot?.expenses || [])
+    .filter(e => inSettlementTab(e, tab) && e.영수증제출상태 !== '제출완료' && e.정산상태 === '미정산')
+    .length;
+}
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+function dayLabel(ymd) {
+  const [y, m, d] = String(ymd).split('-').map(Number);
+  return `${y}.${String(m).padStart(2, '0')}.${String(d).padStart(2, '0')} (${WEEKDAYS[new Date(y, m - 1, d).getDay()]})`;
+}
+
+/** 날짜가 같은 것끼리 묶습니다(이미 날짜순으로 정렬된 목록). */
+function groupByDay(list) {
+  const groups = [];
+  list.forEach(e => {
+    const last = groups[groups.length - 1];
+    if (last && last.date === e.사용일자) last.items.push(e);
+    else groups.push({ date: e.사용일자, items: [e] });
+  });
+  return groups;
+}
+
+/*
+ * 정산 대사.
+ *
+ * 예전에는 "몇 월 몇 주차" 를 고르고 그 주에 쓴 지출만 보여 줬습니다. 그런데 영수증은
+ * 쓴 주가 지나서 내는 일이 많아, 실제로 입금받은 묶음과 주차가 맞지 않았습니다.
+ * 이제 기간을 나누지 않고 정산 대기 전부를 날짜별로 보여 주고, 이번에 입금받은 건만
+ * 직접 고르게 합니다. 대상기간은 고른 지출의 날짜 범위로 자동으로 적힙니다.
+ */
+function renderSettle() {
   const root = el('view-settle');
+  const s = State.settle;
+  if (!State.boot) { root.innerHTML = ''; return; }
+
   const isPastoral = s.tab === '목회비정산';
+  const pending = pendingForSettlement(s.tab);
+  const picked = pending.filter(e => s.selected[e.지출ID]);
+  const sum = picked.reduce((a, e) => a + e.금액, 0);
+  const unsubmitted = unsubmittedForSettlement(s.tab);
+  const allOn = pending.length > 0 && picked.length === pending.length;
+
+  const row = e => `
+    <label class="check-row ${s.selected[e.지출ID] ? 'is-checked' : ''}">
+      <input type="checkbox" data-pick="${UI.esc(e.지출ID)}" ${s.selected[e.지출ID] ? 'checked' : ''}>
+      <div class="cr-body">
+        <div class="cr-top">${UI.esc(e.항목)}${e.목회비세부항목 ? ' · ' + UI.esc(e.목회비세부항목) : ''}</div>
+        <div class="cr-desc">${UI.esc(e.인원_내용 || '주유')}</div>
+      </div>
+      <div class="cr-amt">${UI.won(e.금액)}</div>
+    </label>`;
 
   root.innerHTML = `
     <div class="segmented" id="settle-tabs" style="align-self:center">
@@ -1253,131 +1313,32 @@ async function renderSettle() {
     </div>
 
     <div class="card">
-      <label class="field" ${isPastoral ? '' : 'style="margin-bottom:12px"'}>
-        <span>대상 ${isPastoral ? '월' : '월 선택'}</span>
-        <input type="month" id="s-month" value="${s.month}">
-      </label>
-      ${isPastoral ? '' : `
-        <label class="field" style="margin-bottom:0"><span>주차 <span class="hint">월요일 시작 (ISO 기준)</span></span>
-          <select id="s-week"><option>불러오는 중…</option></select>
-        </label>`}
+      <div class="card-head" style="margin-bottom:6px">
+        <div class="card-title">${UI.icon('scale')} 정산 대기 ${pending.length}건</div>
+        ${pending.length ? `<button class="link-btn" id="s-all">${allOn ? '전체 해제' : '전체 선택'}</button>` : ''}
+      </div>
+      <p class="form-note" style="margin:0">이번에 입금받은 영수증을 고르십시오. 쓴 날짜와 정산 시기가 달라도 됩니다.</p>
+      ${unsubmitted ? `<p class="form-note settle-hint" style="margin:10px 0 0">${UI.icon('circle-alert')} 미제출 ${unsubmitted}건은 제출완료로 바꾸면 여기에 나타납니다.</p>` : ''}
     </div>
 
-    <div id="settle-body"><div class="empty">${UI.icon('loader')}불러오는 중…</div></div>
+    ${pending.length ? groupByDay(pending).map(g => `
+      <div class="day-group">
+        <button class="day-head" data-day="${g.date}">
+          ${UI.icon('calendar-days')}
+          <span class="day-date">${dayLabel(g.date)}</span>
+          <span class="day-count">${g.items.length}건</span>
+          <span class="day-sum">${UI.won(g.items.reduce((a, e) => a + e.금액, 0))}</span>
+        </button>
+        <div class="list">${g.items.map(row).join('')}</div>
+      </div>`).join('')
+      : `<div class="empty">${UI.icon('circle-check')}정산 대기 중인 지출이 없습니다.</div>`}
 
-    <div class="section-title">정산 기록</div>
-    <div class="list" id="settle-history"></div>`;
+    ${pending.length ? `
+      <div class="total-row"><span id="s-count">선택 ${picked.length}건</span><span id="s-sum">${UI.won(sum)}</span></div>
 
-  UI.refreshIcons(root);
-
-  root.querySelector('#settle-tabs').onclick = ev => {
-    const btn = ev.target.closest('button');
-    if (!btn) return;
-    State.settle = { ...State.settle, tab: btn.dataset.tab, week: '', candidates: [], selected: {}, capture: null };
-    renderSettle();
-  };
-  root.querySelector('#s-month').onchange = async ev => {
-    s.month = ev.target.value;
-    s.week = '';
-    await refreshSettleTarget();
-  };
-
-  renderSettleHistory();
-  await refreshSettleTarget();
-}
-
-async function refreshSettleTarget() {
-  const s = State.settle;
-  const root = el('view-settle');
-  const body = root.querySelector('#settle-body');
-  if (!body) return;
-
-  if (s.tab === '경비정산') {
-    const weekSel = root.querySelector('#s-week');
-    try {
-      const { weeks } = await API.call('weeksOfMonth', { month: s.month });
-      s.weeks = weeks;
-      if (!s.week || !weeks.some(w => w.key === s.week)) s.week = weeks[0]?.key || '';
-      weekSel.innerHTML = weeks.map(w => `<option value="${w.key}"${w.key === s.week ? ' selected' : ''}>${UI.esc(w.label)}</option>`).join('');
-      weekSel.onchange = async () => { s.week = weekSel.value; await loadCandidates(); };
-    } catch (e) {
-      weekSel.innerHTML = '<option>주차를 불러오지 못했습니다</option>';
-      return;
-    }
-  }
-  await loadCandidates();
-}
-
-async function loadCandidates() {
-  const s = State.settle;
-  const body = el('view-settle').querySelector('#settle-body');
-  const period = s.tab === '목회비정산' ? s.month : s.week;
-  if (!period) { body.innerHTML = ''; return; }
-
-  body.innerHTML = `<div class="empty">${UI.icon('loader')}불러오는 중…</div>`;
-  UI.refreshIcons(body);
-  try {
-    const res = await API.call('settlementCandidates', { 정산유형: s.tab, 대상기간: period });
-    // 후보는 정산 대기(제출완료·미정산)만 옵니다. 미제출은 몇 건인지만 받아 안내합니다.
-    const candidates = res.candidates || [];
-    s.candidates = candidates;
-    s.unsubmittedInPeriod = res.미제출건수 || 0;
-    s.selected = {};
-    candidates.forEach(c => { if (!c.정산기록ID) s.selected[c.지출ID] = true; }); // 기본 전체 선택
-    renderSettleForm();
-  } catch (e) {
-    body.innerHTML = `<div class="empty">${UI.esc(e.message)}</div>`;
-  }
-}
-
-function renderSettleForm() {
-  const s = State.settle;
-  const body = el('view-settle').querySelector('#settle-body');
-  const open = s.candidates.filter(c => !c.정산기록ID);
-  const done = s.candidates.filter(c => c.정산기록ID);
-  const sum = open.filter(c => s.selected[c.지출ID]).reduce((a, c) => a + c.금액, 0);
-
-  const unsubmittedHint = s.unsubmittedInPeriod
-    ? `<p class="form-note settle-hint">${UI.icon('circle-alert')} 이 기간 미제출 영수증 ${s.unsubmittedInPeriod}건은 제출완료로 바꾸면 여기에 나타납니다.</p>`
-    : '';
-
-  if (!s.candidates.length) {
-    body.innerHTML = `${unsubmittedHint}<div class="empty">${UI.icon('inbox')}이 기간에 정산 대기인 지출이 없습니다.</div>`;
-    UI.refreshIcons(body);
-    return;
-  }
-
-  const row = c => `
-    <label class="check-row">
-      <input type="checkbox" data-pick="${UI.esc(c.지출ID)}" ${s.selected[c.지출ID] ? 'checked' : ''}>
-      <div class="cr-body">
-        <div class="cr-top">${UI.dateLabel(c.사용일자)} · ${UI.esc(c.항목)}${c.목회비세부항목 ? ' · ' + UI.esc(c.목회비세부항목) : ''}</div>
-        <div class="cr-desc">${UI.esc(c.인원_내용 || '주유')}</div>
-      </div>
-      <div class="cr-amt">${UI.won(c.금액)}</div>
-    </label>`;
-
-  body.innerHTML = `${unsubmittedHint}
-    <div class="list">${open.map(row).join('') || `<div class="empty">${UI.icon('circle-check')}이 기간의 지출은 모두 정산되었습니다.</div>`}</div>
-
-    ${done.length ? `
-      <div class="section-title" style="margin-top:16px">이미 정산됨</div>
-      <div class="list">${done.map(c => `
-        <div class="check-row" style="opacity:.6">
-          <div class="cr-body">
-            <div class="cr-top">${UI.dateLabel(c.사용일자)} · ${UI.esc(c.정산기록ID)}</div>
-            <div class="cr-desc">${UI.esc(c.인원_내용 || '주유')}</div>
-          </div>
-          <div class="cr-amt">${UI.won(c.금액)}</div>
-        </div>`).join('')}</div>` : ''}
-
-    ${open.length ? `
-      <div class="spacer"></div>
-      <div class="total-row"><span>선택 지출 합계</span><span id="s-sum">${UI.won(sum)}</span></div>
-
-      <div class="card" style="margin-top:14px">
+      <div class="card">
         <div class="field"><span>입금 확인 방식</span>
-          <div class="segmented" id="s-method">
+          <div class="segmented is-block" id="s-method">
             <button data-method="수기입력" class="${s.method === '수기입력' ? 'is-active' : ''}">직접 금액 입력</button>
             <button data-method="캡처이미지" class="${s.method === '캡처이미지' ? 'is-active' : ''}">캡처 이미지</button>
           </div>
@@ -1392,7 +1353,7 @@ function renderSettleForm() {
 
         <label class="field"><span>입금액</span>
           <input type="number" id="s-deposit" inputmode="numeric" placeholder="${sum}" value="${s.deposit ?? ''}">
-          <span class="hint">비워두면 선택 합계(${UI.won(sum)})와 같은 금액으로 저장합니다.</span>
+          <span class="hint">비워두면 선택 합계와 같은 금액으로 저장합니다.</span>
         </label>
         <label class="field" style="margin-bottom:0"><span>입금일</span>
           <input type="date" id="s-depositdate" value="${s.depositDate || State.boot.meta.today}">
@@ -1400,83 +1361,128 @@ function renderSettleForm() {
       </div>
 
       <div class="sticky-actions">
-        <button class="btn btn-primary btn-block" id="s-save" ${sum ? '' : 'disabled'}>정산 저장</button>
-      </div>` : ''}`;
+        <button class="btn btn-primary btn-block" id="s-save" ${picked.length ? '' : 'disabled'}>정산 저장</button>
+      </div>` : ''}
 
-  UI.refreshIcons(body);
+    <div class="section-title">정산 기록</div>
+    <div class="list" id="settle-history"></div>`;
 
-  body.querySelectorAll('[data-pick]').forEach(cb => {
-    cb.onchange = () => {
-      s.selected[cb.dataset.pick] = cb.checked;
-      const newSum = open.filter(c => s.selected[c.지출ID]).reduce((a, c) => a + c.금액, 0);
-      const sumEl = body.querySelector('#s-sum');
-      if (sumEl) sumEl.textContent = UI.won(newSum);
-      const dep = body.querySelector('#s-deposit');
-      if (dep) dep.placeholder = newSum;
-      const save = body.querySelector('#s-save');
-      if (save) save.disabled = !newSum;
+  UI.refreshIcons(root);
+  bindSettle(root, pending);
+  renderSettleHistory();
+}
+
+function bindSettle(root, pending) {
+  const s = State.settle;
+
+  // 체크할 때마다 전체를 다시 그리지 않고 합계와 버튼만 고칩니다(스크롤 유지).
+  const refresh = () => {
+    const picked = pending.filter(e => s.selected[e.지출ID]);
+    const sum = picked.reduce((a, e) => a + e.금액, 0);
+    root.querySelector('#s-count').textContent = `선택 ${picked.length}건`;
+    root.querySelector('#s-sum').textContent = UI.won(sum);
+    root.querySelector('#s-save').disabled = !picked.length;
+    const dep = root.querySelector('#s-deposit');
+    if (dep) dep.placeholder = sum;
+    const all = root.querySelector('#s-all');
+    if (all) all.textContent = picked.length === pending.length ? '전체 해제' : '전체 선택';
+  };
+  const setChecked = (id, on) => {
+    s.selected[id] = on;
+    const cb = root.querySelector(`[data-pick="${id}"]`);
+    if (cb) { cb.checked = on; cb.closest('.check-row').classList.toggle('is-checked', on); }
+  };
+
+  root.querySelector('#settle-tabs').onclick = ev => {
+    const btn = ev.target.closest('button');
+    if (!btn || btn.dataset.tab === s.tab) return;
+    State.settle = { ...s, tab: btn.dataset.tab, selected: {}, capture: null, deposit: '', requestId: null };
+    renderSettle();
+  };
+
+  root.querySelectorAll('[data-pick]').forEach(cb => {
+    cb.onchange = () => { setChecked(cb.dataset.pick, cb.checked); refresh(); };
+  });
+
+  // 날짜 줄을 누르면 그날 것을 한꺼번에 고르거나 풉니다.
+  root.querySelectorAll('[data-day]').forEach(head => {
+    head.onclick = () => {
+      const items = pending.filter(e => e.사용일자 === head.dataset.day);
+      const turnOn = !items.every(e => s.selected[e.지출ID]);
+      items.forEach(e => setChecked(e.지출ID, turnOn));
+      refresh();
     };
   });
 
-  const methodBox = body.querySelector('#s-method');
-  if (methodBox) methodBox.onclick = ev => {
+  const all = root.querySelector('#s-all');
+  if (all) all.onclick = () => {
+    const turnOn = !pending.every(e => s.selected[e.지출ID]);
+    pending.forEach(e => setChecked(e.지출ID, turnOn));
+    refresh();
+  };
+
+  const method = root.querySelector('#s-method');
+  if (method) method.onclick = ev => {
     const btn = ev.target.closest('button');
     if (!btn) return;
     s.method = btn.dataset.method;
-    renderSettleForm();
+    renderSettle();
   };
 
-  const capBtn = body.querySelector('#s-capture-btn');
+  const capBtn = root.querySelector('#s-capture-btn');
   if (capBtn) {
-    const input = body.querySelector('#s-capture-input');
+    const input = root.querySelector('#s-capture-input');
     capBtn.onclick = () => input.click();
     input.onchange = async () => {
       if (!input.files[0]) return;
-      try {
-        s.capture = await UI.readImage(input.files[0]);
-        renderSettleForm();
-      } catch (e) { UI.toast(e.message, 'danger'); }
+      try { s.capture = await UI.readImage(input.files[0]); renderSettle(); }
+      catch (e) { UI.toast(e.message, 'danger'); }
     };
   }
 
-  const dep = body.querySelector('#s-deposit');
+  const dep = root.querySelector('#s-deposit');
   if (dep) dep.oninput = () => { s.deposit = dep.value; };
-  const depDate = body.querySelector('#s-depositdate');
+  const depDate = root.querySelector('#s-depositdate');
   if (depDate) depDate.onchange = () => { s.depositDate = depDate.value; };
 
-  const save = body.querySelector('#s-save');
-  if (save) save.onclick = () => submitSettlement(open);
+  const save = root.querySelector('#s-save');
+  if (save) save.onclick = () => submitSettlement(pending);
 }
 
-async function submitSettlement(open) {
+function submitSettlement(pending) {
   const s = State.settle;
-  const ids = open.filter(c => s.selected[c.지출ID]).map(c => c.지출ID);
-  const sum = open.filter(c => s.selected[c.지출ID]).reduce((a, c) => a + c.금액, 0);
-  const deposit = Number(s.deposit) || sum;
-  const period = s.tab === '목회비정산' ? s.month : s.week;
+  const picked = pending.filter(e => s.selected[e.지출ID]);
+  if (!picked.length) return;
 
-  UI.loading(true, '정산 저장 중…');
-  try {
-    const res = await API.call('createSettlement', {
-      정산유형: s.tab,
-      대상기간: period,
-      입금액: deposit,
-      입금일: s.depositDate || State.boot.meta.today,
+  const ids = picked.map(e => e.지출ID);
+  const sum = picked.reduce((a, e) => a + e.금액, 0);
+  const deposit = Number(s.deposit) || sum;
+  const depositDate = s.depositDate || State.boot.meta.today;
+  const diff = deposit - sum;
+
+  // 대상기간은 고른 지출의 날짜 범위로 적습니다.
+  const dates = picked.map(e => e.사용일자).sort();
+  const period = dates[0] === dates[dates.length - 1] ? dates[0] : `${dates[0]}~${dates[dates.length - 1]}`;
+  const 요청ID = s.requestId || API.newRequestId();
+
+  // 화면에는 바로 반영하고, 저장은 뒤에서 합니다(서버와 같은 규칙).
+  patchExpensesLocal(ids, e => { e.정산상태 = diff === 0 ? '정산완료' : '금액불일치'; });
+  State.settle = { ...s, selected: {}, capture: null, deposit: '', depositDate: '', requestId: null };
+  renderSettle();
+  UI.toast(diff === 0
+    ? `정산 완료 — ${ids.length}건 ${UI.won(deposit)}`
+    : `차액 ${UI.won(Math.abs(diff))} — 확인이 필요합니다`, diff === 0 ? '' : 'danger');
+
+  backgroundWrite(
+    () => API.call('createSettlement', {
+      정산유형: s.tab, 대상기간: period, 입금액: deposit, 입금일: depositDate,
       입금확인방식: s.method,
       imageBase64: s.method === '캡처이미지' ? s.capture?.base64 : '',
       mimeType: s.capture?.mimeType || '',
-      연결된지출ID목록: ids,
-      요청ID: (s.requestId = s.requestId || API.newRequestId())
-    });
-    State.settle = { ...s, selected: {}, capture: null, deposit: '', depositDate: '', requestId: null };
-    UI.toast(res.중복요청 ? '이미 저장된 정산입니다.'
-      : res.차액 === 0 ? '정산 완료 — 금액이 일치합니다.' : `차액 ${UI.won(Math.abs(res.차액))} 발생`,
-      res.중복요청 || res.차액 === 0 ? '' : 'danger');
-    await reload();
-    go('settle');
-  } catch (e) {
-    UI.toast(e.message, 'danger');
-  } finally { UI.loading(false); }
+      연결된지출ID목록: ids, 요청ID
+    }),
+    '정산을 서버에 저장하지 못했습니다.'
+  );
 }
 
 function renderSettleHistory() {
@@ -1929,7 +1935,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.15-1';
+const APP_VERSION = '2026.09.18-1';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
