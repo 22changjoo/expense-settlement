@@ -330,6 +330,30 @@ const UI = (() => {
     return `<div class="gauge"><div class="gauge-fill${cls}" style="width:${p}%"></div>${overlay}</div>`;
   }
 
+  /** 링 게이지(Midnight 테마용). 실사용은 진하게, 정기구독 예상분까지는 옅게 그립니다. */
+  function ring(used, projected, limit, tn) {
+    const C = 2 * Math.PI * 74;
+    const pct = v => Math.min(100, limit && v ? (v / limit) * 100 : 0);
+    const dash = v => `${(pct(v) * C / 100).toFixed(1)} ${C.toFixed(1)}`;
+    const cls = tn === 'danger' ? ' is-danger' : tn === 'warn' ? ' is-warn' : '';
+    const arc = (c, v) => (pct(v) > 0
+      ? `<circle class="${c}" cx="90" cy="90" r="74" stroke-dasharray="${dash(v)}"/>` : '');
+    return `<svg class="ring" viewBox="0 0 180 180" aria-hidden="true">
+      <circle class="ring-track" cx="90" cy="90" r="74"/>
+      ${projected > used ? arc('ring-proj', projected) : ''}${arc('ring-fill' + cls, used)}
+    </svg>`;
+  }
+
+  /** 눈금 막대 게이지(Ink 테마용). 30칸 중 사용한 만큼 채웁니다. */
+  function ticks(used, projected, limit) {
+    const N = 30;
+    const n = v => Math.min(N, limit && v ? Math.round((v / limit) * N) : 0);
+    const a = n(used), b = Math.max(a, n(projected));
+    let out = '';
+    for (let i = 0; i < N; i++) out += `<i class="${i < a ? 'on' : i < b ? 'proj' : ''}"></i>`;
+    return `<div class="hero-ticks" aria-hidden="true">${out}</div>`;
+  }
+
   /**
    * 구성비 도넛. slices = [{이름, 금액, 색}] (금액 내림차순).
    * 가운데에는 비중이 가장 큰 항목을 표시합니다.
@@ -400,7 +424,7 @@ const UI = (() => {
   return {
     getTheme, setTheme, THEMES,
     won, num, esc, dateLabel, pct, tone, icon, refreshIcons, statusBadges,
-    toast, loading, openSheet, closeSheet, confirmSheet, initSheetDrag, readImage, readReceiptFile, isPdf, gauge, fileSize,
+    ring, ticks, toast, loading, openSheet, closeSheet, confirmSheet, initSheetDrag, readImage, readReceiptFile, isPdf, gauge, fileSize,
     donut, CATEGORY_ICON, SUB_ICON
   };
 })();

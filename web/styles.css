@@ -655,3 +655,66 @@ html[data-theme="c"] .tab.is-active { color: var(--text); font-weight: 700; }
 .theme-swatch i { display: block; border-radius: 4px; height: 8px; }
 .theme-swatch i:first-child { height: 22px; }
 .theme-opt small { font-size: 11.5px; font-weight: 400; color: var(--text-3); }
+
+/* ---------- 시안 요소: 아이콘 칩 · 요약 카드 · 링/눈금 게이지 ---------- */
+
+.card-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.card-pair .card { padding: 16px; }
+.card-pair .card .amount-main { font-size: 21px; }
+.card-pair .card .amount-sub { font-size: 12.5px; }
+.card-pair .kv { flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 0; }
+.card-pair .kv .v { text-align: left; }
+@media (max-width: 340px) { .card-pair { grid-template-columns: 1fr; } }
+
+/* 알림 줄: 줄은 중립색, 아이콘 칩에만 색을 둡니다. */
+.alert-row.danger, .alert-row.warn { background: var(--surface); border-color: var(--border); color: var(--text); }
+.al-ico { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); }
+.alert-row.danger .al-ico { background: var(--danger-soft); color: var(--danger); }
+.alert-row.warn .al-ico { background: var(--warn-soft); color: var(--warn); }
+
+.bd-ico { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 11px; background: var(--surface-2); }
+.bd-ico svg { color: var(--text-2); }
+
+html[data-theme="a"] .item-icon { width: 40px; height: 40px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); }
+html[data-theme="b"] .item-icon, html[data-theme="b"] .bd-ico { background: var(--surface-2); color: var(--accent); }
+html[data-theme="b"] .bd-ico svg { color: var(--accent); }
+
+html[data-theme="c"] .item-icon, html[data-theme="c"] .bd-ico { background: none; color: var(--text); }
+html[data-theme="c"] .bd-ico { width: 24px; }
+html[data-theme="c"] .bd-ico svg { color: var(--text); }
+html[data-theme="c"] .al-ico { background: none; width: auto; height: auto; }
+html[data-theme="c"] .alert-row.danger .al-ico { color: var(--danger); }
+
+/* 링 게이지: Midnight */
+.hero-ring, .hero-ticks { display: none; }
+html[data-theme="b"] .hero-ring { display: flex; position: relative; width: 216px; height: 216px; margin: 4px auto 6px; align-items: center; justify-content: center; }
+html[data-theme="b"] .card-hero > .gauge { display: none; }
+html[data-theme="b"] .card-hero:has(.hero-ring) > .amount-row { display: none; }
+.ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 14; stroke-linecap: round; }
+.ring-track { stroke: var(--border); }
+.ring-proj { stroke: color-mix(in srgb, var(--accent) 38%, var(--surface)); }
+.ring-fill { stroke: var(--accent); }
+.ring-fill.is-warn { stroke: var(--warn); }
+.ring-fill.is-danger { stroke: var(--danger); }
+.ring-center { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ring-center small { font-size: 12px; color: var(--text-3); }
+.ring-center b { font-family: var(--font-num); font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+
+/* 눈금 게이지: Ink */
+html[data-theme="c"] .hero-ticks { display: grid; grid-template-columns: repeat(30, 1fr); gap: 3px; margin: 12px 0 6px; }
+html[data-theme="c"] .card-hero > .gauge { display: none; }
+.hero-ticks i { display: block; height: 26px; border-radius: 2px; background: var(--surface-2); }
+.hero-ticks i.on { background: var(--text); }
+.hero-ticks i.proj { background: var(--accent-bg); }
+
+/* ---------- 넓은 화면 ---------- */
+
+@media (min-width: 960px) {
+  .view { max-width: 1080px; }
+  #view-dashboard { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  #view-dashboard > .card-hero { grid-column: 1; }
+  #view-dashboard > .card-pair { grid-column: 2; grid-template-columns: 1fr; }
+  #view-dashboard > .section-title, #view-dashboard > .list { grid-column: 1 / -1; }
+  html[data-theme] .tabbar { left: 50%; right: auto; width: 560px; transform: translateX(-50%); }
+}

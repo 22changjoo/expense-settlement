@@ -245,7 +245,7 @@ function renderDashboard() {
       ? `<div class="projected">실사용 ${UI.num(s.실사용)}</div>` : '';
     return `
       <div class="bd-row">
-        ${UI.icon(UI.SUB_ICON[s.이름] || 'circle-ellipsis')}
+        <span class="bd-ico">${UI.icon(UI.SUB_ICON[s.이름] || 'circle-ellipsis')}</span>
         <div class="bd-name">${UI.esc(s.이름)}</div>
         <div class="bd-bar">${hasLimit ? UI.gauge(s.실사용, s.한도, projected ? s.예상포함 : 0) : ''}</div>
         <div class="bd-amt">${UI.num(s.표시액)}${hasLimit ? ` <span class="projected">/ ${UI.num(s.한도)}</span>` : ''}${extra}</div>
@@ -286,6 +286,11 @@ function renderDashboard() {
       </div>
 
       ${isRatio ? ratioBody(subs, used) : `
+        <div class="hero-ring">
+          ${UI.ring(p.실사용, projected ? p.예상포함 : 0, p.한도, t)}
+          <div class="ring-center"><small>사용액</small><b>${UI.won(used)}</b><small>/ ${UI.won(p.한도)}</small></div>
+        </div>
+        ${UI.ticks(p.실사용, projected ? p.예상포함 : 0, p.한도)}
         ${UI.gauge(p.실사용, p.한도, projected ? p.예상포함 : 0)}
         <div class="gauge-meta">
           <span>${UI.pct(used, p.한도)}%</span>
@@ -300,6 +305,7 @@ function renderDashboard() {
         </div>`}
     </div>
 
+    <div class="card-pair">
     <div class="card ${fuelTone ? 'tone-' + fuelTone : ''}">
       <div class="card-head"><div class="card-title">${UI.icon('fuel')} 주유비</div></div>
       <div class="amount-row">
@@ -326,6 +332,8 @@ function renderDashboard() {
           ${d.경비.정산대기건수 ? `<span class="badge warn" style="margin-left:6px">${UI.icon('circle-alert')}확인 필요</span>` : ''}
         </span>
       </div>
+    </div>
+
     </div>
 
     ${alerts.length ? `<div class="section-title">확인할 항목</div><div class="list">${alerts.join('')}</div>` : ''}
@@ -446,7 +454,7 @@ function projectionDetail(p) {
 
 function alertRow(iconName, label, count, variant, filter) {
   return `<button class="alert-row ${variant}" data-alert="${filter}">
-    ${UI.icon(iconName)}<span class="grow">${label}</span>
+    <span class="al-ico">${UI.icon(iconName)}</span><span class="grow">${label}</span>
     <span class="count">${count}건</span>${UI.icon('chevron-right')}
   </button>`;
 }
@@ -1997,7 +2005,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.10.05-2';
+const APP_VERSION = '2026.10.05-3';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
