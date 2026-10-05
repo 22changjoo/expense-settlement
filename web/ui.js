@@ -375,7 +375,30 @@ const UI = (() => {
     </div>`;
   }
 
+  /* ---- 화면 테마 ---- */
+  const THEMES = [
+    { id: 'a', name: 'Calm Blue', desc: '밝은 파랑', color: '#2f6be6' },
+    { id: 'b', name: 'Midnight', desc: '다크 민트', color: '#0b0f14' },
+    { id: 'c', name: 'Ink', desc: '흰 바탕·먹색', color: '#ffffff' }
+  ];
+  const THEME_KEY = 'expense_theme';
+  function getTheme() {
+    let id = '';
+    try { id = localStorage.getItem(THEME_KEY) || ''; } catch (e) {}
+    return THEMES.some(t => t.id === id) ? id : 'a';
+  }
+  function setTheme(id, save = true) {
+    if (!THEMES.some(t => t.id === id)) id = 'a';
+    document.documentElement.dataset.theme = id;
+    if (save) { try { localStorage.setItem(THEME_KEY, id); } catch (e) {} }
+    // 주소창·상태줄 색을 화면 바탕에 맞춥니다.
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta && bg) meta.setAttribute('content', bg);
+  }
+
   return {
+    getTheme, setTheme, THEMES,
     won, num, esc, dateLabel, pct, tone, icon, refreshIcons, statusBadges,
     toast, loading, openSheet, closeSheet, confirmSheet, initSheetDrag, readImage, readReceiptFile, isPdf, gauge, fileSize,
     donut, CATEGORY_ICON, SUB_ICON

@@ -266,7 +266,7 @@ function renderDashboard() {
   const isRatio = State.pastoralView === 'ratio';
 
   root.innerHTML = `
-    <div class="card ${t ? 'tone-' + t : ''}">
+    <div class="card card-hero ${t ? 'tone-' + t : ''}">
       <div class="card-head">
         <div class="card-title">${UI.icon('heart-handshake')} 목회비</div>
         <div class="segmented" id="pastoral-view">
@@ -1652,6 +1652,17 @@ function renderSettings() {
 
   root.innerHTML = `
     <div class="card">
+      <div class="card-head"><div class="card-title">${UI.icon('palette')} 화면 테마</div></div>
+      <div class="theme-grid" id="theme-grid">
+        ${UI.THEMES.map(th => `
+          <button class="theme-opt ${th.id === UI.getTheme() ? 'is-active' : ''}" data-theme-pick="${th.id}" aria-pressed="${th.id === UI.getTheme()}">
+            ${themeSwatch(th.id)}
+            <span>${th.name}</span><small>${th.desc}</small>
+          </button>`).join('')}
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-head">
         <div class="card-title">${UI.icon('wallet')} 예산 한도</div>
         <div style="display:flex;gap:6px;align-items:center">
@@ -1729,8 +1740,26 @@ function renderSettings() {
   bindSettings(root, budget, addable);
 }
 
+/** 테마 선택 칸의 미리보기 그림. */
+function themeSwatch(id) {
+  const m = {
+    a: ['#f3f5fa', 'linear-gradient(180deg,#6aa8f7,#2f6be6)', '#dfe4f0'],
+    b: ['#0b0f14', '#4fe3a6', '#263240'],
+    c: ['#ffffff', '#ff5a1f', '#e6e6e6']
+  }[id];
+  return `<div class="theme-swatch" style="background:${m[0]};border:1px solid #d5d9e2">
+    <i style="background:${m[1]}"></i><i style="background:${m[2]}"></i><i style="background:${m[2]};width:60%"></i></div>`;
+}
+
 function bindSettings(root, budget, addable) {
   const b = State.boot;
+
+  root.querySelectorAll('[data-theme-pick]').forEach(btn => {
+    btn.onclick = () => {
+      UI.setTheme(btn.dataset.themePick);
+      renderSettings();
+    };
+  });
 
   root.querySelector('#budget-year').onchange = ev => {
     State.budgetYear = Number(ev.target.value);
@@ -1968,7 +1997,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.09.18-2';
+const APP_VERSION = '2026.10.05-1';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -1999,6 +2028,7 @@ function showUpdateToast() {
   document.getElementById('toasts').appendChild(el);
 }
 
+UI.setTheme(UI.getTheme(), false);
 UI.refreshIcons(document.body);
 UI.initSheetDrag();
 boot();
