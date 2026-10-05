@@ -84,7 +84,7 @@ html[data-theme="c"] {
   --radius-sm: 10px;
   --shadow: none;
   --font: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif;
-  --font-num: "DM Mono", var(--font);
+  --font-num: var(--font);
   --cat-1: #111111; --cat-2: #ff5a1f; --cat-3: #8a8a8a; --cat-4: #c9c9c9;
   --cat-5: #4a4a4a; --cat-6: #ffa27d; --cat-7: #a8a8a8;
 }
@@ -626,7 +626,7 @@ html[data-theme="a"] .tabbar {
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   box-shadow: 0 10px 30px rgba(14, 20, 51, .14);
 }
-html[data-theme="a"] .topbar { background: transparent; backdrop-filter: none; border-bottom: 0; }
+html[data-theme="a"] .topbar { border-bottom-color: transparent; }
 
 html[data-theme="b"] .tab-primary { border-radius: 18px; box-shadow: none; }
 html[data-theme="b"] .segmented { background: var(--bg); }
