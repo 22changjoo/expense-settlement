@@ -10,7 +10,7 @@ const State = {
   showProjection: false,   // 정기구독 예상 내역 펼침 여부
   listSelect: { on: false, ids: {}, date: '', prevFilters: null },   // 영수증 일괄 제출 선택
   budgetYear: null,        // 설정 화면에서 보고 있는 예산 연도
-  listFilters: { 항목: '전체', 세부: '전체', 기간: '올해', 상태: '전체', from: '', to: '' },
+  listFilters: { 항목: '전체', 세부: '전체', 기간: '올해', 상태: '전체', from: '', to: '', 검색: '' },
   upload: null,        // { dataUrl, base64, mimeType, form, analysis }
   settle: { tab: '목회비정산', selected: {}, method: '수기입력', capture: null, deposit: '', depositDate: '', requestId: null }
 };
@@ -559,6 +559,25 @@ function bindExpenseCards(root) {
 
 /* ---------------- 화면 C. 지출 목록 ---------------- */
 
+/**
+ * 검색어 쪼개기.
+ * 띄어쓴 낱말은 모두 들어 있어야 합니다("심방 9월" → 심방이면서 9월).
+ * 금액은 쉼표를 빼고 견줍니다("12,000" 으로 찾아도 12000 을 찾도록).
+ */
+function searchTerms(q) {
+  return String(q || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+/** 내용·비고·항목·세부항목·날짜·금액·지출ID 어디든 걸리면 찾은 것으로 봅니다. */
+function matchesSearch(e, terms) {
+  const haystack = [
+    e.인원_내용, e.비고, e.항목, e.목회비세부항목, e.사용일자, e.지출ID,
+    String(e.금액), Number(e.금액).toLocaleString('ko-KR')
+  ].join(' ').toLowerCase();
+  const plain = haystack.replace(/,/g, '');
+  return terms.every(t => haystack.includes(t) || plain.includes(t.replace(/,/g, '')));
+}
+
 function filteredExpenses() {
   const f = State.listFilters;
   const now = new Date();
@@ -566,7 +585,10 @@ function filteredExpenses() {
   const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
+  const terms = searchTerms(f.검색);
+
   return (State.boot?.expenses || []).filter(e => {
+    if (terms.length && !matchesSearch(e, terms)) return false;
     if (f.항목 !== '전체' && e.항목 !== f.항목) return false;
     if (f.항목 === '목회비' && f.세부 !== '전체' && e.목회비세부항목 !== f.세부) return false;
 
@@ -597,7 +619,6 @@ function renderList() {
   const rows = filteredExpenses();
   if (State.listSelect.on) { renderSelectList(root, rows); return; }
 
-  const total = rows.reduce((a, e) => a + e.금액, 0);
   // 일괄 제출은 '미제출' 을 보고 있을 때만 둡니다. 정산 대기 등 다른 목록에서는
   // 제출과 무관하므로 보이지 않게 합니다.
   const unsubmitted = f.상태 === '미제출'
@@ -617,6 +638,12 @@ function renderList() {
       </button>` : ''}
 
     <div class="card">
+      <div class="field search-field">
+        ${UI.icon('search')}
+        <input type="search" id="list-search" placeholder="내용 · 비고 · 금액 검색"
+          value="${UI.esc(f.검색)}" autocomplete="off" enterkeyhint="search">
+        <button class="icon-btn" id="search-clear" aria-label="검색어 지우기" ${f.검색 ? '' : 'hidden'}>${UI.icon('x')}</button>
+      </div>
       <div class="field"><span>항목</span>${chips('항목', ['전체', ...meta.categories], f.항목)}</div>
       ${f.항목 === '목회비'
         ? `<div class="field"><span>목회비 세부항목</span>
@@ -634,12 +661,7 @@ function renderList() {
       </div>
     </div>
 
-    <div class="total-row"><span>${rows.length}건</span><span>${UI.won(total)}</span></div>
-
-    <div class="list">
-      ${rows.length ? rows.map(expenseCard).join('')
-        : `<div class="empty">${UI.icon('search-x')}조건에 맞는 지출이 없습니다.</div>`}
-    </div>`;
+    <div id="list-results">${listResults(rows)}</div>`;
 
   UI.refreshIcons(root);
 
@@ -658,7 +680,43 @@ function renderList() {
   });
   const startBtn = root.querySelector('#sel-start');
   if (startBtn) startBtn.onclick = enterSelect;
+
+  // 검색은 글자를 칠 때마다 결과만 갈아 끼웁니다(전체를 다시 그리면 입력칸이 풀립니다).
+  const search = root.querySelector('#list-search');
+  search.oninput = () => {
+    State.listFilters.검색 = search.value;
+    root.querySelector('#search-clear').hidden = !search.value;
+    refreshListResults();
+  };
+  root.querySelector('#search-clear').onclick = () => {
+    State.listFilters.검색 = '';
+    search.value = '';
+    root.querySelector('#search-clear').hidden = true;
+    refreshListResults();
+    search.focus();
+  };
+
   bindExpenseCards(root);
+}
+
+/** 건수·합계·카드 목록 */
+function listResults(rows) {
+  const total = rows.reduce((a, e) => a + e.금액, 0);
+  const q = State.listFilters.검색;
+  return `
+    <div class="total-row"><span>${rows.length}건</span><span>${UI.won(total)}</span></div>
+    <div class="list">
+      ${rows.length ? rows.map(expenseCard).join('')
+        : `<div class="empty">${UI.icon('search-x')}${q ? `“${UI.esc(q)}” 에 맞는 지출이 없습니다.` : '조건에 맞는 지출이 없습니다.'}</div>`}
+    </div>`;
+}
+
+function refreshListResults() {
+  const box = el('view-list').querySelector('#list-results');
+  if (!box) return;
+  box.innerHTML = listResults(filteredExpenses());
+  UI.refreshIcons(box);
+  bindExpenseCards(box);
 }
 
 /* ---------------- 영수증 일괄 제출 ---------------- */
@@ -2072,7 +2130,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.10.05-4';
+const APP_VERSION = '2026.10.05-5';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
