@@ -958,11 +958,14 @@ function renderUpload() {
       ${receiptPreview(u)}
       <div class="card" style="text-align:center">
         <div class="spinner" style="margin:6px auto 14px"></div>
-        <p class="muted" style="margin:0 0 14px">영수증을 분석하고 있습니다…</p>
+        <p class="muted" style="margin:0 0 6px">영수증을 분석하고 있습니다… <span id="analysis-elapsed">0초</span></p>
+        <p class="form-note" id="analysis-slow" style="margin:0 0 14px" hidden>
+          평소보다 늦어지고 있습니다. 기다리지 않고 직접 입력하셔도 됩니다.</p>
         <button class="btn btn-sm" id="skip-analysis">건너뛰고 직접 입력</button>
       </div>`;
     UI.refreshIcons(root);
     root.querySelector('#skip-analysis').onclick = skipAnalysis;
+    startAnalysisTicker();
     return;
   }
 
@@ -1112,13 +1115,13 @@ async function handleReceiptFile(file) {
   }
 
   const requestId = API.newRequestId();
-  State.upload = { ...picked, analyzing: true, form: null, requestId };
+  State.upload = { ...picked, analyzing: true, form: null, requestId, startedAt: Date.now() };
   renderUpload();
 
   let analysis = null, subscriptionMatch = null, analysisError = '';
   try {
     // 일시적 통신 오류는 API.call 이 한 번 더 보내고, Claude 혼잡은 서버가 다시 시도합니다.
-    const res = await API.call('analyzeReceipt', { imageBase64: picked.base64, mimeType: picked.mimeType }, { retries: 1 });
+    const res = await API.call('analyzeReceipt', { imageBase64: picked.base64, mimeType: picked.mimeType }, { retries: 2 });
     if (res.ok) { analysis = res.data; subscriptionMatch = res.subscriptionMatch; }
     else analysisError = res.error + ' 값을 직접 입력해 주세요.';
   } catch (e) {
@@ -1134,6 +1137,20 @@ async function handleReceiptFile(file) {
     form: buildUploadForm(analysis, subscriptionMatch)
   };
   if (State.view === 'upload') renderUpload();
+}
+
+/** 분석이 몇 초째인지 보여 줍니다. 멈춘 것처럼 보이지 않도록. */
+let analysisTimer = null;
+function startAnalysisTicker() {
+  clearInterval(analysisTimer);
+  analysisTimer = setInterval(() => {
+    const label = document.getElementById('analysis-elapsed');
+    if (!label || !State.upload?.analyzing) { clearInterval(analysisTimer); return; }
+    const sec = Math.round((Date.now() - (State.upload.startedAt || Date.now())) / 1000);
+    label.textContent = `${sec}초`;
+    const slow = document.getElementById('analysis-slow');
+    if (slow && sec >= 12) slow.hidden = false;
+  }, 1000);
 }
 
 /** 영수증이 없는 지출(경조사비 등)을 곧바로 입력합니다. */
@@ -1242,35 +1259,85 @@ function canSaveUpload(f) {
   return true;
 }
 
-async function saveUpload() {
+/**
+ * 영수증 저장.
+ *
+ * 예전에는 서버 저장(2~8초, 가끔 더)과 전체 다시 불러오기(4~8초)를 화면을 막은 채
+ * 차례로 기다렸습니다. 둘 중 하나만 늦어도 한참 멈춘 것처럼 보였습니다.
+ * 이제 이 기기에 먼저 반영해 바로 보여 주고, 서버 저장은 뒤에서 합니다.
+ * 요청ID 가 붙어 있어 다시 보내도 중복 저장되지 않습니다.
+ */
+function saveUpload() {
   const u = State.upload, f = u.form;
   if (!canSaveUpload(f)) return;
-  UI.loading(true, '저장 중…');
-  try {
-    const res = await API.call('createExpense', {
-      항목: f.항목,
-      목회비세부항목: f.목회비세부항목,
-      사용일자: f.사용일자,
-      금액: Number(f.금액),
-      인원_내용: f.인원_내용,
-      비고: f.비고,
-      연결구독ID: f.연결구독ID,
-      imageBase64: u.base64 || '',
-      mimeType: u.mimeType || '',
-      영수증제출상태: u.kind === 'none' ? '영수증없음' : '미제출',
-      요청ID: u.requestId
-    });
-    resetUpload();
-    UI.toast(res && res.중복요청
-      ? '이미 저장된 영수증입니다. 중복으로 저장하지 않았습니다.'
-      : u.kind === 'none'
-      ? '등록했습니다. 영수증이 없는 지출이라 바로 정산 대기로 올라갑니다.'
-      : '등록했습니다. 영수증 제출상태는 “미제출”입니다.');
-    await reload();
-    go('dashboard');
-  } catch (e) {
-    UI.toast(e.message, 'danger');
-  } finally { UI.loading(false); }
+
+  const payload = {
+    항목: f.항목,
+    목회비세부항목: f.항목 === '목회비' ? f.목회비세부항목 : '',
+    사용일자: f.사용일자,
+    금액: Number(f.금액),
+    인원_내용: f.항목 === '주유비' ? '' : String(f.인원_내용 || '').trim(),
+    비고: f.비고,
+    연결구독ID: f.연결구독ID,
+    imageBase64: u.base64 || '',
+    mimeType: u.mimeType || '',
+    영수증제출상태: u.kind === 'none' ? '영수증없음' : '미제출',
+    요청ID: u.requestId
+  };
+
+  addExpenseLocal({
+    지출ID: '등록중-' + u.requestId.slice(0, 8),
+    등록일시: new Date().toISOString(),
+    사용일자: payload.사용일자,
+    항목: payload.항목,
+    목회비세부항목: payload.목회비세부항목,
+    인원_내용: payload.인원_내용,
+    금액: payload.금액,
+    영수증이미지URL: '',
+    영수증제출상태: payload.영수증제출상태,
+    제출일: '',
+    정산기록ID: '',
+    정산상태: '미정산',
+    연결구독ID: payload.연결구독ID,
+    비고: payload.비고
+  });
+
+  resetUpload();
+  go('dashboard');
+  UI.toast(payload.영수증제출상태 === '영수증없음'
+    ? '등록했습니다. 영수증이 없는 지출이라 바로 정산 대기로 올라갑니다.'
+    : '등록했습니다. 영수증 제출상태는 “미제출”입니다.');
+
+  backgroundWrite(
+    () => API.call('createExpense', payload),
+    '영수증을 서버에 저장하지 못했습니다.'
+  );
+}
+
+/** 새 지출을 이 기기 데이터에 더합니다(서버 응답을 기다리지 않고 화면에 보이도록). */
+function addExpenseLocal(e) {
+  const b = State.boot;
+  if (!b) return;
+  b.expenses = [e, ...(b.expenses || [])];
+
+  const d = b.dashboard;
+  if (d && e.사용일자.slice(0, 4) === String(b.meta.year)) {
+    if (e.항목 === '목회비') {
+      d.목회비.실사용 += e.금액;
+      // 정기구독에 연결된 건은 예상액이 이미 잡혀 있으므로 예상 합계는 그대로 둡니다.
+      if (!e.연결구독ID) d.목회비.예상포함 += e.금액;
+      const sub = (d.목회비.세부항목 || []).find(x => x.이름 === e.목회비세부항목);
+      if (sub) { sub.실사용 += e.금액; if (!e.연결구독ID) sub.예상포함 += e.금액; }
+    } else if (e.항목 === '주유비') {
+      d.주유비.실사용 += e.금액;
+    } else {
+      d.경비.올해누적 += e.금액;
+      if (e.사용일자.slice(0, 7) === d.이번달) d.경비.이번달누적 += e.금액;
+    }
+    d.최근등록 = [e, ...(d.최근등록 || [])].slice(0, 5);
+  }
+  recomputeBadges();
+  saveSnapshot(b);
 }
 
 /* ---------------- 화면 D. 정산 대사 ---------------- */
@@ -2005,7 +2072,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.10.05-3';
+const APP_VERSION = '2026.10.05-4';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

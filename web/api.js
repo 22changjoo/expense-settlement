@@ -53,8 +53,8 @@ const API = (() => {
    * 있기도 합니다. 그만 기다리고 다시 보내는 편이 빠릅니다. 영수증 분석과 사진이
    * 실리는 저장은 원래 오래 걸리므로 넉넉히 둡니다.
    */
-  const TIMEOUT_MS = { analyzeReceipt: 75000, createExpense: 60000, createSettlement: 60000, importExpenses: 120000 };
-  const DEFAULT_TIMEOUT_MS = 30000;
+  const TIMEOUT_MS = { analyzeReceipt: 15000, createExpense: 20000, createSettlement: 20000, importExpenses: 120000 };
+  const DEFAULT_TIMEOUT_MS = 25000;
 
   /** 다시 보내면 나아질 수 있는 실패(연결 끊김, 깨진 응답, 너무 늦은 응답, 구글이 요청을 되돌린 경우) */
   class TransientError extends Error {}
@@ -67,13 +67,15 @@ const API = (() => {
     // 알려 준 요청만 다시 보냅니다.
     const retries = opts.retries ?? ((READ_ACTIONS.has(action) || payload.요청ID) ? 2 : 0);
     const requestBody = JSON.stringify({ token, action, payload });
-    const timeoutMs = opts.timeoutMs ?? TIMEOUT_MS[action] ?? DEFAULT_TIMEOUT_MS;
+    // 정상 응답은 2~8초입니다. 그보다 한참 늦으면 붙잡혀 있는 것이므로 끊고 다시 보냅니다.
+    // 다만 다시 보낼수록 조금씩 더 기다려 줍니다(진짜로 느린 순간도 있으므로).
+    const baseTimeout = opts.timeoutMs ?? TIMEOUT_MS[action] ?? DEFAULT_TIMEOUT_MS;
 
     let lastError = null;
     for (let attempt = 0; attempt <= retries; attempt++) {
       if (attempt > 0) await sleep(1200 * attempt);
       try {
-        return await sendOnce(url, requestBody, action, timeoutMs);
+        return await sendOnce(url, requestBody, action, Math.round(baseTimeout * (1 + attempt * 0.5)));
       } catch (e) {
         if (!(e instanceof TransientError)) throw e;   // 토큰·입력 오류는 다시 보내도 같습니다
         lastError = e;
