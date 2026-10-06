@@ -1044,7 +1044,7 @@ function renderUpload() {
     <div class="card">
       ${u.analysisError ? `<p class="form-error">${UI.esc(u.analysisError)}</p>` : ''}
       ${u.analysisSkipped ? `<p class="form-note" style="margin-top:0">자동 분석을 건너뛰었습니다. 값을 직접 입력해 주세요.</p>` : ''}
-      ${u.analysis?.vendor ? `<p class="form-note" style="margin-top:0">인식한 상호: <b>${UI.esc(u.analysis.vendor)}</b>${u.analysis.confidence ? ` · 신뢰도 ${UI.esc(u.analysis.confidence)}` : ''}</p>` : ''}
+      ${analysisNote(u.analysis)}
       ${u.kind === 'pdf'
         ? `<p class="form-note" style="margin-top:0">PDF · ${UI.fileSize(u.bytes)} · 원본 그대로 보관합니다</p>`
         : u.bytes ? `<p class="form-note" style="margin-top:0">저장 크기 ${UI.fileSize(u.bytes)}${u.originalBytes > u.bytes ? ` (원본 ${UI.fileSize(u.originalBytes)} 에서 줄임)` : ''} · ${u.width}×${u.height}</p>` : ''}
@@ -1069,7 +1069,8 @@ function renderUpload() {
         <input type="date" id="f-date" value="${UI.esc(f.사용일자)}">
       </label>
 
-      <label class="field"><span>금액</span>
+      <label class="field"><span>금액${u.analysis?.amount_source
+        ? ` <span class="hint">영수증의 “${UI.esc(u.analysis.amount_source)}” 에서 읽었습니다</span>` : ''}</span>
         <input type="number" id="f-amt" inputmode="numeric" placeholder="0" value="${f.금액 || ''}">
       </label>
 
@@ -1124,6 +1125,20 @@ function subscriptionField(f, match) {
       </select>
       ${auto ? `<span class="hint" style="color:var(--accent)">영수증에서 자동으로 찾았습니다.</span>` : ''}
     </div>`;
+}
+
+/**
+ * 영수증에서 무엇을 읽었는지 한 줄로 알려 줍니다.
+ * 신뢰도가 낮으면 색을 달리해서 "확인하고 저장하라"는 신호를 줍니다.
+ */
+function analysisNote(a) {
+  if (!a || (!a.vendor && !a.product)) return '';
+  const conf = { high: '또렷하게 읽음', medium: '읽었지만 확인 권장', low: '흐릿함 — 꼭 확인하세요' };
+  const cls = a.confidence === 'low' ? 'form-error' : 'form-note';
+  const name = a.vendor || a.product;
+  return `<p class="${cls}" style="margin-top:0">인식한 상호: <b>${UI.esc(name)}</b>`
+    + `${a.product && a.product !== name ? ` · ${UI.esc(a.product)}` : ''}`
+    + ` · ${conf[a.confidence] || a.confidence || ''}</p>`;
 }
 
 /** 건강관리 미니 게이지 — 저장 전에 한도 초과 여부를 바로 확인합니다. */
@@ -2130,7 +2145,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.10.05-5';
+const APP_VERSION = '2026.10.06-1';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

@@ -53,7 +53,7 @@ const API = (() => {
    * 있기도 합니다. 그만 기다리고 다시 보내는 편이 빠릅니다. 영수증 분석과 사진이
    * 실리는 저장은 원래 오래 걸리므로 넉넉히 둡니다.
    */
-  const TIMEOUT_MS = { analyzeReceipt: 15000, createExpense: 20000, createSettlement: 20000, importExpenses: 120000 };
+  const TIMEOUT_MS = { analyzeReceipt: 45000, createExpense: 20000, createSettlement: 20000, importExpenses: 120000 };
   const DEFAULT_TIMEOUT_MS = 25000;
 
   /** 다시 보내면 나아질 수 있는 실패(연결 끊김, 깨진 응답, 너무 늦은 응답, 구글이 요청을 되돌린 경우) */

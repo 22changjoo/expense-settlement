@@ -209,15 +209,16 @@ const UI = (() => {
    * 업로드 전 이미지를 줄입니다.
    *
    * 영수증은 글자만 읽히면 되므로 원본 그대로 둘 이유가 없습니다.
-   * 목표 용량(기본 200KB) 안에 들어올 때까지 해상도와 품질을 단계적으로 낮춥니다.
-   * 1400px / 품질 0.75 면 대개 100~200KB 이고, 금액·날짜를 읽는 데 충분합니다.
+   * 목표 용량(기본 420KB) 안에 들어올 때까지 해상도와 품질을 단계적으로 낮춥니다.
+   * 긴 변 1568px 은 Claude 가 이미지를 줄이지 않고 그대로 보는 최대 크기입니다.
+   * 더 줄이면 영수증의 작은 숫자(쉼표·자릿수)가 뭉개져 오인식이 늘어납니다.
    */
   const IMAGE_STEPS = [
-    { maxSide: 1400, quality: 0.75 },
+    { maxSide: 1568, quality: 0.82 },
+    { maxSide: 1568, quality: 0.70 },
     { maxSide: 1400, quality: 0.62 },
-    { maxSide: 1200, quality: 0.60 },
-    { maxSide: 1000, quality: 0.55 },
-    { maxSide: 900,  quality: 0.45 }
+    { maxSide: 1200, quality: 0.55 },
+    { maxSide: 1000, quality: 0.45 }
   ];
 
   function encodeAt(img, maxSide, quality) {
@@ -240,7 +241,7 @@ const UI = (() => {
     return Math.floor(b64.length * 3 / 4) - padding;
   }
 
-  function readImage(file, targetBytes = 200 * 1024) {
+  function readImage(file, targetBytes = 420 * 1024) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(new Error('이미지를 읽지 못했습니다.'));
