@@ -153,8 +153,6 @@ function analyzeReceipt_(base64, mimeType) {
   var payload = {
     model: CFG.ANTHROPIC_MODEL,
     max_tokens: 700,
-    // 영수증은 글자를 정확히 옮겨 적는 일이라 상상의 여지가 없어야 합니다.
-    temperature: 0,
     messages: [{
       role: 'user',
       content: [fileBlock, { type: 'text', text: visionPrompt_() }]

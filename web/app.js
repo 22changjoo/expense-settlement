@@ -1042,7 +1042,7 @@ function renderUpload() {
     ${receiptPreview(u)}
 
     <div class="card">
-      ${u.analysisError ? `<p class="form-error">${UI.esc(u.analysisError)}</p>` : ''}
+      ${u.analysisError ? `<p class="form-note" style="margin-top:0">${UI.esc(u.analysisError)}</p>` : ''}
       ${u.analysisSkipped ? `<p class="form-note" style="margin-top:0">자동 분석을 건너뛰었습니다. 값을 직접 입력해 주세요.</p>` : ''}
       ${analysisNote(u.analysis)}
       ${u.kind === 'pdf'
@@ -1128,17 +1128,30 @@ function subscriptionField(f, match) {
 }
 
 /**
- * 영수증에서 무엇을 읽었는지 한 줄로 알려 줍니다.
- * 신뢰도가 낮으면 색을 달리해서 "확인하고 저장하라"는 신호를 줍니다.
+ * 영수증에서 무엇을 읽었고 무엇을 못 읽었는지 알려 줍니다.
+ * 일부만 읽혀도 읽은 값은 그대로 채워 두고, 빈칸만 짚어 줍니다.
+ * (금액만 읽히고 상호·분류를 못 찾아도 그대로 쓰실 수 있도록)
  */
 function analysisNote(a) {
-  if (!a || (!a.vendor && !a.product)) return '';
-  const conf = { high: '또렷하게 읽음', medium: '읽었지만 확인 권장', low: '흐릿함 — 꼭 확인하세요' };
-  const cls = a.confidence === 'low' ? 'form-error' : 'form-note';
+  if (!a) return '';
   const name = a.vendor || a.product;
-  return `<p class="${cls}" style="margin-top:0">인식한 상호: <b>${UI.esc(name)}</b>`
-    + `${a.product && a.product !== name ? ` · ${UI.esc(a.product)}` : ''}`
-    + ` · ${conf[a.confidence] || a.confidence || ''}</p>`;
+  const missing = [];
+  if (!Number(a.amount)) missing.push('금액');
+  if (!a.date) missing.push('사용일자');
+  if (!name) missing.push('상호');
+
+  const conf = { high: '또렷하게 읽음', medium: '읽었지만 확인 권장', low: '흐릿함 — 꼭 확인하세요' };
+  const lines = [];
+  if (name) {
+    lines.push(`<p class="${a.confidence === 'low' ? 'form-error' : 'form-note'}" style="margin-top:0">`
+      + `인식한 상호: <b>${UI.esc(name)}</b>`
+      + `${a.product && a.product !== name ? ` · ${UI.esc(a.product)}` : ''}`
+      + ` · ${conf[a.confidence] || a.confidence || ''}</p>`);
+  }
+  if (missing.length) {
+    lines.push(`<p class="form-note" style="margin-top:0">${missing.join(' · ')}은(는) 읽지 못했습니다. 직접 채워 주세요.</p>`);
+  }
+  return lines.join('');
 }
 
 /** 건강관리 미니 게이지 — 저장 전에 한도 초과 여부를 바로 확인합니다. */
@@ -1175,6 +1188,20 @@ function buildUploadForm(analysis, subscriptionMatch) {
   };
 }
 
+/**
+ * 분석이 안 됐을 때 화면에 띄울 한 줄.
+ * API 응답 원문(400 본문, 스택 등)은 읽어도 도움이 안 되고 겁만 주므로
+ * 콘솔에만 남기고, 화면에는 무엇을 하면 되는지만 적습니다.
+ */
+function failureNote(detail) {
+  if (detail) console.warn('영수증 분석 실패:', detail);
+  const d = String(detail || '');
+  if (/크레딧|credit/i.test(d)) return 'Claude 크레딧이 부족해 자동 인식을 쓸 수 없습니다. 값을 직접 입력해 주세요.';
+  if (/API 키|401/.test(d)) return 'Claude API 키 설정을 확인해 주세요. 값은 직접 입력하실 수 있습니다.';
+  if (/혼잡|529|한도|429/.test(d)) return '지금은 인식 서버가 혼잡합니다. 값을 직접 입력하시거나 잠시 뒤 다시 올려 주세요.';
+  return '영수증을 자동으로 읽지 못했습니다. 값을 직접 입력해 주세요.';
+}
+
 async function handleReceiptFile(file) {
   if (!file) return;
   let picked;
@@ -1196,9 +1223,9 @@ async function handleReceiptFile(file) {
     // 일시적 통신 오류는 API.call 이 한 번 더 보내고, Claude 혼잡은 서버가 다시 시도합니다.
     const res = await API.call('analyzeReceipt', { imageBase64: picked.base64, mimeType: picked.mimeType }, { retries: 2 });
     if (res.ok) { analysis = res.data; subscriptionMatch = res.subscriptionMatch; }
-    else analysisError = res.error + ' 값을 직접 입력해 주세요.';
+    else analysisError = failureNote(res.error);
   } catch (e) {
-    analysisError = '자동 분석에 실패했습니다 (' + e.message + '). 값을 직접 입력해 주세요.';
+    analysisError = failureNote(e.message);
   }
 
   // 그사이 건너뛰었거나 다른 파일을 골랐으면 늦게 온 결과는 버립니다.
@@ -2145,7 +2172,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.10.06-1';
+const APP_VERSION = '2026.10.07-1';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
