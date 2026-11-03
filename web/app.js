@@ -1915,6 +1915,30 @@ function renderSettings() {
   bindSettings(root, budget, addable);
 }
 
+/** 테마를 바꾸고, 사이드바 바로가기와 현재 화면을 함께 갱신합니다. */
+function applyTheme(id) {
+  UI.setTheme(id);
+  syncSideThemes();
+  if (State.view === 'settings') renderSettings();
+}
+
+/** 넓은 화면 사이드바 아래의 테마 바로가기. */
+function syncSideThemes() {
+  const box = el('side-themes');
+  if (!box) return;
+  const cur = UI.getTheme();
+  box.innerHTML = UI.THEMES.map(t => `
+    <button class="side-theme ${t.id === cur ? 'is-active' : ''}" data-side-theme="${t.id}"
+      aria-label="${t.name} 테마" aria-pressed="${t.id === cur}" title="${t.name}">${themeSwatchDot(t.id)}</button>`).join('');
+  box.querySelectorAll('[data-side-theme]').forEach(b => { b.onclick = () => applyTheme(b.dataset.sideTheme); });
+}
+
+function themeSwatchDot(id) {
+  const c = { a: 'linear-gradient(135deg,#6aa8f7,#2f6be6)', b: 'linear-gradient(135deg,#4fe3a6,#0b0f14)',
+    c: 'linear-gradient(135deg,#ffffff 45%,#ff5a1f 55%)', d: 'linear-gradient(135deg,#ffffff,#7db4ff)' }[id];
+  return `<i style="background:${c}"></i>`;
+}
+
 /** 테마 선택 칸의 미리보기 그림. */
 function themeSwatch(id) {
   const m = {
@@ -1931,10 +1955,7 @@ function bindSettings(root, budget, addable) {
   const b = State.boot;
 
   root.querySelectorAll('[data-theme-pick]').forEach(btn => {
-    btn.onclick = () => {
-      UI.setTheme(btn.dataset.themePick);
-      renderSettings();
-    };
+    btn.onclick = () => applyTheme(btn.dataset.themePick);
   });
 
   root.querySelector('#budget-year').onchange = ev => {
@@ -2173,7 +2194,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.11.03-2';
+const APP_VERSION = '2026.11.03-3';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -2205,6 +2226,7 @@ function showUpdateToast() {
 }
 
 UI.setTheme(UI.getTheme(), false);
+syncSideThemes();
 UI.refreshIcons(document.body);
 UI.initSheetDrag();
 boot();
