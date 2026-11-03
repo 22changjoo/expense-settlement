@@ -147,6 +147,7 @@ function go(view) {
   el('year-select').hidden = !(view === 'dashboard' || view === 'list');
   window.scrollTo({ top: 0 });
   render();
+  syncSubnav();
 }
 
 el('tabbar').addEventListener('click', ev => {
@@ -656,7 +657,7 @@ function renderList() {
              <label class="field"><span>시작</span><input type="date" data-filter-date="from" value="${f.from}"></label>
              <label class="field"><span>종료</span><input type="date" data-filter-date="to" value="${f.to}"></label>
            </div>` : ''}
-      <div class="field" style="margin-bottom:0"><span>상태</span>
+      <div class="field field-status" style="margin-bottom:0"><span>상태</span>
         ${chips('상태', ['전체', '미제출', '정산 대기', '정산완료', '금액불일치'], f.상태)}
       </div>
     </div>
@@ -664,6 +665,7 @@ function renderList() {
     <div id="list-results">${listResults(rows)}</div>`;
 
   UI.refreshIcons(root);
+  syncSubnav();
 
   root.querySelectorAll('[data-filter]').forEach(btn => {
     btn.onclick = () => {
@@ -1916,6 +1918,33 @@ function renderSettings() {
 }
 
 /** 테마를 바꾸고, 사이드바 바로가기와 현재 화면을 함께 갱신합니다. */
+/* 넓은 화면: 사이드바의 '지출' 아래에 상태 필터를 펼칩니다(좁은 화면에서는 CSS 로 숨김). */
+const SUBNAV_STATUS = ['전체', '미제출', '정산 대기', '정산완료', '금액불일치'];
+function syncSubnav() {
+  const group = el('tab-group-list');
+  const box = el('subnav-list');
+  if (!group || !box) return;
+  const open = State.view === 'list' && !!State.boot?.meta;
+  group.classList.toggle('is-open', open);
+  if (!open) return;
+  const rows = State.boot.expenses || [];
+  const count = {
+    '전체': rows.length,
+    '미제출': rows.filter(e => e.영수증제출상태 === '미제출').length,
+    '정산 대기': rows.filter(isAwaitingSettlement).length,
+    '정산완료': rows.filter(e => e.정산상태 === '정산완료').length,
+    '금액불일치': rows.filter(e => e.정산상태 === '금액불일치').length
+  };
+  const cur = State.listFilters.상태;
+  box.innerHTML = SUBNAV_STATUS.map(v => `
+    <button class="subnav-item ${v === cur ? 'is-active' : ''}" data-sub-status="${UI.esc(v)}" aria-pressed="${v === cur}">
+      <span>${UI.esc(v)}</span><em>${count[v]}</em>
+    </button>`).join('');
+  box.querySelectorAll('[data-sub-status]').forEach(b => {
+    b.onclick = () => { State.listFilters.상태 = b.dataset.subStatus; renderList(); };
+  });
+}
+
 function applyTheme(id) {
   UI.setTheme(id);
   syncSideThemes();
@@ -2194,7 +2223,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.11.03-3';
+const APP_VERSION = '2026.11.03-4';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

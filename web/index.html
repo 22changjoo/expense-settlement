@@ -45,7 +45,10 @@
 
   <nav class="tabbar" id="tabbar">
     <button class="tab is-active" data-view="dashboard"><i data-lucide="layout-dashboard"></i><span>홈</span></button>
-    <button class="tab" data-view="list"><i data-lucide="list"></i><span>지출</span></button>
+    <div class="tab-group" id="tab-group-list">
+      <button class="tab" data-view="list"><i data-lucide="list"></i><span>지출</span></button>
+      <div class="subnav" id="subnav-list" role="group" aria-label="지출 상태"></div>
+    </div>
     <button class="tab tab-primary" data-view="upload" aria-label="영수증 등록"><i data-lucide="plus"></i></button>
     <button class="tab" data-view="settle"><i data-lucide="scale"></i><span>정산</span></button>
     <button class="tab" data-view="settings"><i data-lucide="settings"></i><span>설정</span></button>

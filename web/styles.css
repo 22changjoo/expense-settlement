@@ -872,3 +872,21 @@ html[data-theme="d"] input, html[data-theme="d"] select, html[data-theme="d"] te
   html[data-theme="d"] .topbar { padding-left: 288px; }
   html[data-theme="d"] main { padding-left: 288px; }
 }
+
+/* 지출 하위 메뉴(상태 필터) — 넓은 화면의 사이드바에서만 */
+.tab-group { display: contents; }
+.subnav { display: none; }
+@media (min-width: 960px) {
+  .tab-group { display: flex; flex-direction: column; gap: 4px; }
+  .tab-group.is-open .subnav { display: flex; flex-direction: column; gap: 2px; margin: 0 0 6px 26px; padding-left: 10px; border-left: 1.5px solid var(--border); }
+  .subnav-item { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: none; color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+  .subnav-item em { font-style: normal; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .subnav-item:hover { background: var(--surface-2); }
+  .subnav-item.is-active { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+  html[data-theme="c"] .subnav-item.is-active { background: var(--surface-2); }
+  html[data-theme="d"] .subnav { border-left-color: rgba(255,255,255,.7); }
+  html[data-theme="d"] .subnav-item:hover { background: rgba(255,255,255,.35); }
+  html[data-theme="d"] .subnav-item.is-active { background: rgba(255,255,255,.55); }
+  /* 상태는 사이드바에서 고르므로 필터 패널에서는 뺍니다 */
+  .field-status { display: none; }
+}
