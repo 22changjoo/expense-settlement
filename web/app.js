@@ -2173,7 +2173,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.11.03-1';
+const APP_VERSION = '2026.11.03-2';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

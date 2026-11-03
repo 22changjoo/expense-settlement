@@ -716,7 +716,6 @@ html[data-theme="c"] .card-hero > .gauge { display: none; }
   #view-dashboard > .card-hero { grid-column: 1; }
   #view-dashboard > .card-pair { grid-column: 2; grid-template-columns: 1fr; }
   #view-dashboard > .section-title, #view-dashboard > .list { grid-column: 1 / -1; }
-  html[data-theme] .tabbar { left: 50%; right: auto; width: 560px; transform: translateX(-50%); }
 }
 
 /* ---------- 지출 검색 ---------- */
@@ -801,3 +800,36 @@ html[data-theme="d"] .item-icon, html[data-theme="d"] .bd-ico { background: rgba
 html[data-theme="d"] .card-hero .bd-ico { background: rgba(255, 255, 255, .2); }
 html[data-theme="d"] .card-hero .bd-ico svg { color: #fff; }
 html[data-theme="d"] input, html[data-theme="d"] select, html[data-theme="d"] textarea { background: rgba(255, 255, 255, .42); }
+
+/* ---------- 넓은 화면: 하단 탭 → 왼쪽 사이드바 (모든 테마) ---------- */
+
+@media (min-width: 960px) {
+  html[data-theme] { --tabbar-h: 0px; }
+
+  html[data-theme] .tabbar {
+    top: 0; bottom: 0; left: 0; right: auto; width: 232px; height: auto;
+    display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+    padding: 28px 14px 24px; border-radius: 0; transform: none;
+    border: 0; border-right: 1px solid var(--border); box-shadow: none;
+  }
+  html[data-theme="c"] .tabbar { border-right-color: var(--text); }
+  .tabbar::before { content: "경비정산"; font-size: 19px; font-weight: 700; letter-spacing: -.02em; padding: 2px 14px 20px; }
+
+  html[data-theme] .tab {
+    flex-direction: row; justify-content: flex-start; gap: 12px;
+    height: 46px; padding: 0 14px; border-radius: 14px; font-size: 14px; text-align: left;
+  }
+  html[data-theme] .tab.is-active { background: var(--accent-soft); }
+  html[data-theme="c"] .tab.is-active { background: var(--surface-2); }
+  html[data-theme] .tab-primary {
+    order: -1; width: auto; height: 48px; margin: 0 0 14px; justify-content: center; gap: 8px;
+    font-size: 14px; font-weight: 600;
+  }
+  html[data-theme] .tab-primary::after { content: "영수증 등록"; }
+  html[data-theme] .tab-primary.is-active { background: var(--accent-bg); }
+
+  html[data-theme] .topbar { padding-left: 264px; padding-right: 32px; }
+  main { padding: 24px 32px 48px 264px; }
+  .toasts { left: calc(50% + 116px); bottom: 24px; }
+  .sticky-actions { bottom: 12px; }
+}
