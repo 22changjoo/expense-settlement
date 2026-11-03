@@ -763,14 +763,12 @@ html[data-theme="d"] {
   --font-num: var(--font);
   --cat-1: #2563eb; --cat-2: #38bdf8; --cat-3: #818cf8; --cat-4: #34d399;
   --cat-5: #f59e0b; --cat-6: #94a3b8; --cat-7: #64748b;
-  background:
-    radial-gradient(38% 22% at 8% 14%, rgba(59, 130, 246, .65), transparent 70%),
-    radial-gradient(34% 20% at 95% 30%, rgba(14, 165, 233, .45), transparent 70%),
-    radial-gradient(40% 22% at 15% 55%, rgba(129, 140, 248, .45), transparent 70%),
-    radial-gradient(42% 24% at 92% 72%, rgba(59, 130, 246, .5), transparent 70%),
-    radial-gradient(50% 26% at 30% 98%, rgba(56, 189, 248, .55), transparent 70%),
-    linear-gradient(180deg, #eaf2ff, #cfe0fa);
-  background-attachment: fixed;
+  background: #cfe0fa;
+}
+/* 흐린 배경 사진. 고정 레이어라 스크롤해도 카드 뒤에서 움직이지 않고, iOS 에서도 안전합니다. */
+html[data-theme="d"]::before {
+  content: ""; position: fixed; inset: 0; z-index: -1;
+  background: #cfe0fa url("img/glass-bg.jpg") center / cover no-repeat;
 }
 html[data-theme="d"] body { background: transparent; }
 
