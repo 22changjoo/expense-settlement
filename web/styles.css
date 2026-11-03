@@ -604,7 +604,7 @@ input[type=month]::-webkit-date-and-time-value {
 .amount-main, .item-amt, .cr-amt, .bd-amt, .proj-amt, .day-sum, .legend-amt, .legend-pct { font-family: var(--font-num); }
 
 /* 대시보드 첫 카드(목회비). A 는 그라데이션 히어로, 나머지는 보통 카드입니다. */
-html[data-theme="a"] .card-hero, html[data-theme="d"] .card-hero {
+html[data-theme="a"] .card-hero, html:is([data-theme="d"], [data-theme="e"]) .card-hero {
   background: var(--accent-bg);
   border-color: transparent;
   color: #fff;
@@ -616,17 +616,17 @@ html[data-theme="a"] .card-hero, html[data-theme="d"] .card-hero {
   --accent: #fff;
   --accent-soft: rgba(255, 255, 255, .18);
 }
-html[data-theme="a"] .card-hero .amount-main, html[data-theme="d"] .card-hero .amount-main { font-size: 34px; }
-html[data-theme="a"] .card-hero .segmented button.is-active, html[data-theme="d"] .card-hero .segmented button.is-active { background: #fff; color: #2f6be6; box-shadow: none; }
-html[data-theme="a"] .card-hero .gauge-fill:not(.is-warn):not(.is-danger), html[data-theme="d"] .card-hero .gauge-fill:not(.is-warn):not(.is-danger) { background: #fff; }
+html[data-theme="a"] .card-hero .amount-main, html:is([data-theme="d"], [data-theme="e"]) .card-hero .amount-main { font-size: 34px; }
+html[data-theme="a"] .card-hero .segmented button.is-active, html:is([data-theme="d"], [data-theme="e"]) .card-hero .segmented button.is-active { background: #fff; color: #2f6be6; box-shadow: none; }
+html[data-theme="a"] .card-hero .gauge-fill:not(.is-warn):not(.is-danger), html:is([data-theme="d"], [data-theme="e"]) .card-hero .gauge-fill:not(.is-warn):not(.is-danger) { background: #fff; }
 
-html[data-theme="a"] .tabbar, html[data-theme="d"] .tabbar {
+html[data-theme="a"] .tabbar, html:is([data-theme="d"], [data-theme="e"]) .tabbar {
   left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 10px);
   height: 64px; padding-bottom: 0; border: 0; border-radius: 32px;
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   box-shadow: 0 10px 30px rgba(14, 20, 51, .14);
 }
-html[data-theme="a"] .topbar, html[data-theme="d"] .topbar { border-bottom-color: transparent; }
+html[data-theme="a"] .topbar, html:is([data-theme="d"], [data-theme="e"]) .topbar { border-bottom-color: transparent; }
 
 html[data-theme="b"] .tab-primary { border-radius: 18px; box-shadow: none; }
 html[data-theme="b"] .segmented { background: var(--bg); }
@@ -675,7 +675,7 @@ html[data-theme="c"] .tab.is-active { color: var(--text); font-weight: 700; }
 .bd-ico { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 11px; background: var(--surface-2); }
 .bd-ico svg { color: var(--text-2); }
 
-html[data-theme="a"] .item-icon, html[data-theme="d"] .item-icon { width: 40px; height: 40px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); }
+html[data-theme="a"] .item-icon, html:is([data-theme="d"], [data-theme="e"]) .item-icon { width: 40px; height: 40px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); }
 html[data-theme="b"] .item-icon, html[data-theme="b"] .bd-ico { background: var(--surface-2); color: var(--accent); }
 html[data-theme="b"] .bd-ico svg { color: var(--accent); }
 
@@ -739,7 +739,7 @@ html[data-theme="c"] .card-hero > .gauge { display: none; }
 
 /* ---------- D · Glass (유리 질감 블루) ---------- */
 
-html[data-theme="d"] {
+html:is([data-theme="d"], [data-theme="e"]) {
   color-scheme: light;
   --bg: #e4eefc;
   --surface: rgba(255, 255, 255, .26);
@@ -765,41 +765,41 @@ html[data-theme="d"] {
   background: #cfe0fa;
 }
 /* 흐린 배경 사진. 고정 레이어라 스크롤해도 카드 뒤에서 움직이지 않고, iOS 에서도 안전합니다. */
-html[data-theme="d"]::before {
+html:is([data-theme="d"], [data-theme="e"])::before {
   content: ""; position: fixed; inset: 0; z-index: -1;
   background: #cfe0fa url("img/glass-bg.jpg") center / cover no-repeat;
 }
-html[data-theme="d"] body { background: transparent; }
+html:is([data-theme="d"], [data-theme="e"]) body { background: transparent; }
 
-html[data-theme="d"] .card,
-html[data-theme="d"] .item-card,
-html[data-theme="d"] .alert-row,
-html[data-theme="d"] .check-row,
-html[data-theme="d"] .onboarding-card {
+html:is([data-theme="d"], [data-theme="e"]) .card,
+html:is([data-theme="d"], [data-theme="e"]) .item-card,
+html:is([data-theme="d"], [data-theme="e"]) .alert-row,
+html:is([data-theme="d"], [data-theme="e"]) .check-row,
+html:is([data-theme="d"], [data-theme="e"]) .onboarding-card {
   -webkit-backdrop-filter: blur(30px) saturate(1.8);
   backdrop-filter: blur(30px) saturate(1.8);
   border-color: rgba(255, 255, 255, .6);
   box-shadow: var(--shadow);
 }
-html[data-theme="d"] .card-hero {
+html:is([data-theme="d"], [data-theme="e"]) .card-hero {
   -webkit-backdrop-filter: none; backdrop-filter: none;
   box-shadow: 0 14px 36px rgba(37, 99, 235, .3), inset 0 1px 0 rgba(255, 255, 255, .45);
 }
-html[data-theme="d"] .tabbar {
+html:is([data-theme="d"], [data-theme="e"]) .tabbar {
   background: rgba(255, 255, 255, .32);
   -webkit-backdrop-filter: blur(30px) saturate(1.8);
   backdrop-filter: blur(30px) saturate(1.8);
   border: 1px solid rgba(255, 255, 255, .7);
   box-shadow: 0 10px 32px rgba(37, 99, 235, .18);
 }
-html[data-theme="d"] .topbar { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom-color: transparent; }
-html[data-theme="d"] .sheet-panel { background: rgba(255, 255, 255, .9); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
-html[data-theme="d"] .segmented { background: rgba(255, 255, 255, .3); }
-html[data-theme="d"] .segmented button.is-active { background: rgba(255, 255, 255, .85); }
-html[data-theme="d"] .item-icon, html[data-theme="d"] .bd-ico { background: rgba(255, 255, 255, .45); color: var(--accent); }
-html[data-theme="d"] .card-hero .bd-ico { background: rgba(255, 255, 255, .2); }
-html[data-theme="d"] .card-hero .bd-ico svg { color: #fff; }
-html[data-theme="d"] input, html[data-theme="d"] select, html[data-theme="d"] textarea { background: rgba(255, 255, 255, .42); }
+html:is([data-theme="d"], [data-theme="e"]) .topbar { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom-color: transparent; }
+html:is([data-theme="d"], [data-theme="e"]) .sheet-panel { background: rgba(255, 255, 255, .9); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+html:is([data-theme="d"], [data-theme="e"]) .segmented { background: rgba(255, 255, 255, .3); }
+html:is([data-theme="d"], [data-theme="e"]) .segmented button.is-active { background: rgba(255, 255, 255, .85); }
+html:is([data-theme="d"], [data-theme="e"]) .item-icon, html:is([data-theme="d"], [data-theme="e"]) .bd-ico { background: rgba(255, 255, 255, .45); color: var(--accent); }
+html:is([data-theme="d"], [data-theme="e"]) .card-hero .bd-ico { background: rgba(255, 255, 255, .2); }
+html:is([data-theme="d"], [data-theme="e"]) .card-hero .bd-ico svg { color: #fff; }
+html:is([data-theme="d"], [data-theme="e"]) input, html:is([data-theme="d"], [data-theme="e"]) select, html:is([data-theme="d"], [data-theme="e"]) textarea { background: rgba(255, 255, 255, .42); }
 
 /* ---------- 넓은 화면: 하단 탭 → 왼쪽 사이드바 (모든 테마) ---------- */
 
@@ -841,8 +841,8 @@ html[data-theme="d"] input, html[data-theme="d"] select, html[data-theme="d"] te
 @media (min-width: 960px) {
   .side-foot { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding: 14px; border-radius: 18px; background: var(--surface-2); }
   .side-foot-label { font-size: 11.5px; font-weight: 600; letter-spacing: .06em; color: var(--text-3); }
-  .side-themes { display: flex; gap: 10px; }
-  .side-theme { width: 34px; height: 34px; padding: 3px; border-radius: 999px; border: 2px solid transparent; background: none; cursor: pointer; }
+  .side-themes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .side-theme { width: 30px; height: 30px; padding: 3px; border-radius: 999px; border: 2px solid transparent; background: none; cursor: pointer; }
   .side-theme i { display: block; width: 100%; height: 100%; border-radius: 999px; border: 1px solid rgba(0, 0, 0, .12); }
   .side-theme.is-active { border-color: var(--accent); }
 
@@ -855,7 +855,7 @@ html[data-theme="d"] input, html[data-theme="d"] select, html[data-theme="d"] te
 
 /* Glass: 떠 있는 유리 사이드바 */
 @media (min-width: 960px) {
-  html[data-theme="d"] .tabbar {
+  html:is([data-theme="d"], [data-theme="e"]) .tabbar {
     top: 14px; bottom: 14px; left: 14px; width: 244px; border-radius: 30px;
     padding: 22px 12px 14px;
     background: rgba(255, 255, 255, .3);
@@ -863,14 +863,14 @@ html[data-theme="d"] input, html[data-theme="d"] select, html[data-theme="d"] te
     border: 1px solid rgba(255, 255, 255, .7);
     box-shadow: 0 18px 50px rgba(30, 64, 175, .18), inset 0 1px 0 rgba(255, 255, 255, .85);
   }
-  html[data-theme="d"] .tab { color: var(--text-2); }
-  html[data-theme="d"] .tab.is-active {
+  html:is([data-theme="d"], [data-theme="e"]) .tab { color: var(--text-2); }
+  html:is([data-theme="d"], [data-theme="e"]) .tab.is-active {
     background: rgba(255, 255, 255, .55); color: var(--text); font-weight: 600;
     border: 1px solid rgba(255, 255, 255, .85); box-shadow: 0 4px 14px rgba(30, 64, 175, .12);
   }
-  html[data-theme="d"] .side-foot { background: rgba(255, 255, 255, .35); border: 1px solid rgba(255, 255, 255, .6); }
-  html[data-theme="d"] .topbar { padding-left: 288px; }
-  html[data-theme="d"] main { padding-left: 288px; }
+  html:is([data-theme="d"], [data-theme="e"]) .side-foot { background: rgba(255, 255, 255, .35); border: 1px solid rgba(255, 255, 255, .6); }
+  html:is([data-theme="d"], [data-theme="e"]) .topbar { padding-left: 288px; }
+  html:is([data-theme="d"], [data-theme="e"]) main { padding-left: 288px; }
 }
 
 /* 지출 하위 메뉴(상태 필터) — 넓은 화면의 사이드바에서만 */
@@ -884,9 +884,34 @@ html[data-theme="d"] input, html[data-theme="d"] select, html[data-theme="d"] te
   .subnav-item:hover { background: var(--surface-2); }
   .subnav-item.is-active { background: var(--accent-soft); color: var(--text); font-weight: 600; }
   html[data-theme="c"] .subnav-item.is-active { background: var(--surface-2); }
-  html[data-theme="d"] .subnav { border-left-color: rgba(255,255,255,.7); }
-  html[data-theme="d"] .subnav-item:hover { background: rgba(255,255,255,.35); }
-  html[data-theme="d"] .subnav-item.is-active { background: rgba(255,255,255,.55); }
+  html:is([data-theme="d"], [data-theme="e"]) .subnav { border-left-color: rgba(255,255,255,.7); }
+  html:is([data-theme="d"], [data-theme="e"]) .subnav-item:hover { background: rgba(255,255,255,.35); }
+  html:is([data-theme="d"], [data-theme="e"]) .subnav-item.is-active { background: rgba(255,255,255,.55); }
   /* 상태는 사이드바에서 고르므로 필터 패널에서는 뺍니다 */
   .field-status { display: none; }
+}
+
+/* ---------- E · Glass 가을 (D 와 같은 유리 구조, 색과 배경만 가을) ---------- */
+html[data-theme="e"] {
+  --bg: #f3dfc0;
+  --text: #2b2118;
+  --text-2: #5a4636;
+  --text-3: #6f5a47;
+  --accent: #b5521b;
+  --accent-soft: rgba(181, 82, 27, .14);
+  --accent-bg: linear-gradient(160deg, #f2a15a 0%, #d9702c 50%, #b5521b 100%);
+  --ok: #3f6a22; --ok-soft: rgba(63, 106, 34, .14);
+  --warn: #8a5300; --warn-soft: rgba(224, 160, 48, .22);
+  --danger: #a82a1c; --danger-soft: rgba(196, 64, 44, .14);
+  --shadow: 0 10px 36px rgba(90, 45, 12, .14), inset 0 1px 0 rgba(255, 255, 255, .85), inset 0 -1px 0 rgba(255, 255, 255, .25);
+  --cat-1: #b5521b; --cat-2: #e0a030; --cat-3: #8a9a52; --cat-4: #c2413a;
+  --cat-5: #d98a4a; --cat-6: #a8917a; --cat-7: #7a6652;
+  background: #f3dfc0;
+}
+html[data-theme="e"]::before { background: #f3dfc0 url("img/autumn-bg.jpg") center / cover no-repeat; }
+html[data-theme="e"] .card-hero { box-shadow: 0 14px 36px rgba(181, 82, 27, .3), inset 0 1px 0 rgba(255, 255, 255, .45); }
+html[data-theme="e"] .card-hero .segmented button.is-active { color: #b5521b; }
+html[data-theme="e"] .tabbar { box-shadow: 0 10px 32px rgba(120, 60, 20, .18); }
+@media (min-width: 960px) {
+  html[data-theme="e"] .tabbar { box-shadow: 0 18px 50px rgba(120, 60, 20, .2), inset 0 1px 0 rgba(255, 255, 255, .85); }
 }

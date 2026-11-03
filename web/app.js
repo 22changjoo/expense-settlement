@@ -1964,7 +1964,7 @@ function syncSideThemes() {
 
 function themeSwatchDot(id) {
   const c = { a: 'linear-gradient(135deg,#6aa8f7,#2f6be6)', b: 'linear-gradient(135deg,#4fe3a6,#0b0f14)',
-    c: 'linear-gradient(135deg,#ffffff 45%,#ff5a1f 55%)', d: 'linear-gradient(135deg,#ffffff,#7db4ff)' }[id];
+    c: 'linear-gradient(135deg,#ffffff 45%,#ff5a1f 55%)', d: 'linear-gradient(135deg,#ffffff,#7db4ff)', e: 'linear-gradient(135deg,#fff3dc,#e0782f)' }[id];
   return `<i style="background:${c}"></i>`;
 }
 
@@ -1974,7 +1974,8 @@ function themeSwatch(id) {
     a: ['#f3f5fa', 'linear-gradient(180deg,#6aa8f7,#2f6be6)', '#dfe4f0'],
     b: ['#0b0f14', '#4fe3a6', '#263240'],
     c: ['#ffffff', '#ff5a1f', '#e6e6e6'],
-    d: ['linear-gradient(135deg,#bcd7ff,#f2f7ff)', 'linear-gradient(160deg,#7db4ff,#2563eb)', 'rgba(255,255,255,.85)']
+    d: ['linear-gradient(135deg,#bcd7ff,#f2f7ff)', 'linear-gradient(160deg,#7db4ff,#2563eb)', 'rgba(255,255,255,.85)'],
+    e: ['linear-gradient(135deg,#f6c98f,#fff1d9)', 'linear-gradient(160deg,#f2a15a,#b5521b)', 'rgba(255,255,255,.85)']
   }[id];
   return `<div class="theme-swatch" style="background:${m[0]};border:1px solid #d5d9e2">
     <i style="background:${m[1]}"></i><i style="background:${m[2]}"></i><i style="background:${m[2]};width:60%"></i></div>`;
@@ -2223,7 +2224,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.11.03-4';
+const APP_VERSION = '2026.11.03-5';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
