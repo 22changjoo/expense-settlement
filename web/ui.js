@@ -404,7 +404,8 @@ const UI = (() => {
   const THEMES = [
     { id: 'a', name: 'Calm Blue', desc: '밝은 파랑', color: '#2f6be6' },
     { id: 'b', name: 'Midnight', desc: '다크 민트', color: '#0b0f14' },
-    { id: 'c', name: 'Ink', desc: '흰 바탕·먹색', color: '#ffffff' }
+    { id: 'c', name: 'Ink', desc: '흰 바탕·먹색', color: '#ffffff' },
+    { id: 'd', name: 'Glass', desc: '유리 질감 블루', color: '#e4eefc' }
   ];
   const THEME_KEY = 'expense_theme';
   function getTheme() {

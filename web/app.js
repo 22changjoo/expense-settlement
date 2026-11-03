@@ -1920,7 +1920,8 @@ function themeSwatch(id) {
   const m = {
     a: ['#f3f5fa', 'linear-gradient(180deg,#6aa8f7,#2f6be6)', '#dfe4f0'],
     b: ['#0b0f14', '#4fe3a6', '#263240'],
-    c: ['#ffffff', '#ff5a1f', '#e6e6e6']
+    c: ['#ffffff', '#ff5a1f', '#e6e6e6'],
+    d: ['linear-gradient(135deg,#bcd7ff,#f2f7ff)', 'linear-gradient(160deg,#7db4ff,#2563eb)', 'rgba(255,255,255,.85)']
   }[id];
   return `<div class="theme-swatch" style="background:${m[0]};border:1px solid #d5d9e2">
     <i style="background:${m[1]}"></i><i style="background:${m[2]}"></i><i style="background:${m[2]};width:60%"></i></div>`;
@@ -2172,7 +2173,7 @@ function openSubscriptionSheet(sub) {
 /* ---------------- 시작 ---------------- */
 
 /** 앱 버전 — 배포마다 올립니다. 설정 화면에 표시해 무엇이 돌고 있는지 확인합니다. */
-const APP_VERSION = '2026.10.07-1';
+const APP_VERSION = '2026.11.03-1';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
