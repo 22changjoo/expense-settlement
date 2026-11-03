@@ -743,12 +743,12 @@ html[data-theme="c"] .card-hero > .gauge { display: none; }
 html[data-theme="d"] {
   color-scheme: light;
   --bg: #e4eefc;
-  --surface: rgba(255, 255, 255, .58);
-  --surface-2: rgba(255, 255, 255, .5);
-  --border: rgba(255, 255, 255, .75);
+  --surface: rgba(255, 255, 255, .26);
+  --surface-2: rgba(255, 255, 255, .28);
+  --border: rgba(255, 255, 255, .6);
   --text: #0c1b3d;
-  --text-2: #43547a;
-  --text-3: #62729a;
+  --text-2: #34456b;
+  --text-3: #4f6089;
   --accent: #2563eb;
   --accent-soft: rgba(37, 99, 235, .12);
   --accent-bg: linear-gradient(160deg, #7db4ff 0%, #4a8cf0 50%, #2563eb 100%);
@@ -758,16 +758,18 @@ html[data-theme="d"] {
   --danger: #b3202d; --danger-soft: rgba(220, 38, 38, .12);
   --radius: 26px;
   --radius-sm: 16px;
-  --shadow: 0 8px 32px rgba(37, 99, 235, .12), inset 0 1px 0 rgba(255, 255, 255, .8);
+  --shadow: 0 10px 36px rgba(30, 64, 175, .14), inset 0 1px 0 rgba(255, 255, 255, .85), inset 0 -1px 0 rgba(255, 255, 255, .25);
   --font: "IBM Plex Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
   --font-num: var(--font);
   --cat-1: #2563eb; --cat-2: #38bdf8; --cat-3: #818cf8; --cat-4: #34d399;
   --cat-5: #f59e0b; --cat-6: #94a3b8; --cat-7: #64748b;
   background:
-    radial-gradient(60% 40% at 12% 8%, rgba(125, 180, 255, .75), transparent 70%),
-    radial-gradient(50% 40% at 92% 28%, rgba(186, 214, 255, .9), transparent 70%),
-    radial-gradient(60% 45% at 30% 95%, rgba(147, 197, 253, .7), transparent 70%),
-    linear-gradient(180deg, #f2f7ff, #dce9fb);
+    radial-gradient(38% 22% at 8% 14%, rgba(59, 130, 246, .65), transparent 70%),
+    radial-gradient(34% 20% at 95% 30%, rgba(14, 165, 233, .45), transparent 70%),
+    radial-gradient(40% 22% at 15% 55%, rgba(129, 140, 248, .45), transparent 70%),
+    radial-gradient(42% 24% at 92% 72%, rgba(59, 130, 246, .5), transparent 70%),
+    radial-gradient(50% 26% at 30% 98%, rgba(56, 189, 248, .55), transparent 70%),
+    linear-gradient(180deg, #eaf2ff, #cfe0fa);
   background-attachment: fixed;
 }
 html[data-theme="d"] body { background: transparent; }
@@ -777,9 +779,9 @@ html[data-theme="d"] .item-card,
 html[data-theme="d"] .alert-row,
 html[data-theme="d"] .check-row,
 html[data-theme="d"] .onboarding-card {
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  backdrop-filter: blur(20px) saturate(1.5);
-  border-color: rgba(255, 255, 255, .75);
+  -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  backdrop-filter: blur(30px) saturate(1.8);
+  border-color: rgba(255, 255, 255, .6);
   box-shadow: var(--shadow);
 }
 html[data-theme="d"] .card-hero {
@@ -787,17 +789,17 @@ html[data-theme="d"] .card-hero {
   box-shadow: 0 14px 36px rgba(37, 99, 235, .3), inset 0 1px 0 rgba(255, 255, 255, .45);
 }
 html[data-theme="d"] .tabbar {
-  background: rgba(255, 255, 255, .62);
-  -webkit-backdrop-filter: blur(22px) saturate(1.6);
-  backdrop-filter: blur(22px) saturate(1.6);
-  border: 1px solid rgba(255, 255, 255, .8);
+  background: rgba(255, 255, 255, .32);
+  -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  backdrop-filter: blur(30px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, .7);
   box-shadow: 0 10px 32px rgba(37, 99, 235, .18);
 }
 html[data-theme="d"] .topbar { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom-color: transparent; }
 html[data-theme="d"] .sheet-panel { background: rgba(255, 255, 255, .9); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
-html[data-theme="d"] .segmented { background: rgba(255, 255, 255, .45); }
-html[data-theme="d"] .segmented button.is-active { background: #fff; }
-html[data-theme="d"] .item-icon, html[data-theme="d"] .bd-ico { background: rgba(255, 255, 255, .7); color: var(--accent); }
+html[data-theme="d"] .segmented { background: rgba(255, 255, 255, .3); }
+html[data-theme="d"] .segmented button.is-active { background: rgba(255, 255, 255, .85); }
+html[data-theme="d"] .item-icon, html[data-theme="d"] .bd-ico { background: rgba(255, 255, 255, .45); color: var(--accent); }
 html[data-theme="d"] .card-hero .bd-ico { background: rgba(255, 255, 255, .2); }
 html[data-theme="d"] .card-hero .bd-ico svg { color: #fff; }
-html[data-theme="d"] input, html[data-theme="d"] select, html[data-theme="d"] textarea { background: rgba(255, 255, 255, .7); }
+html[data-theme="d"] input, html[data-theme="d"] select, html[data-theme="d"] textarea { background: rgba(255, 255, 255, .42); }
